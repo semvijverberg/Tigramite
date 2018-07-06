@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 #%%
 import os
+os.chdir('/Users/semvijverberg/surfdrive/VU_Amsterdam/Scripts/Tigramite')
 import subprocess
 cwd = os.getcwd()
 runfile = os.path.join(cwd, 'saving_repository_to_Github.sh')
