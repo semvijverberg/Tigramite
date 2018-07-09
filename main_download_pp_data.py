@@ -6,16 +6,14 @@ Created on Mon Jul  9 17:48:31 2018
 @author: semvijverberg
 """
 import os
-script_dir = os.chdir('/Users/semvijverberg/surfdrive/Scripts/Tigramite')
+os.chdir('/Users/semvijverberg/surfdrive/Scripts/Tigramite')
+script_dir = os.getcwd()
 import what_variable_pp
 import retrieve_ERA_i
 import functions_pp
-import numpy as np
-import plotting
 Variable = what_variable_pp.Variable
 retrieve_ERA_i_field = retrieve_ERA_i.retrieve_ERA_i_field
 import_array = functions_pp.import_array
-find_region = plotting.find_region
 
 #%%
 # assign instance
