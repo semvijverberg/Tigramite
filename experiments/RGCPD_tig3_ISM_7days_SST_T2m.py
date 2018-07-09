@@ -1,4 +1,13 @@
 # -*- coding: utf-8 -*-
+#%%
+import os
+os.chdir('/Users/semvijverberg/surfdrive/VU_Amsterdam/Scripts/Tigramite')
+import subprocess
+cwd = os.getcwd()
+runfile = os.path.join(cwd, 'saving_repository_to_Github.sh')
+subprocess.call(runfile)
+#%%
+
 import matplotlib
 matplotlib.rcParams['backend'] = "Qt4Agg"
 
@@ -24,7 +33,7 @@ import sklearn
 import sys, os
 
 # add my own python functions
-sys.path.append('/Users/semvijverberg/PycharmProjects/Tigramite/')
+sys.path.append('/Users/semvijverberg/surfdrive/VU_Amsterdam/Scripts/Tigramite')
 #%%
 #import tigramite
 from tigramite import data_processing as pp
@@ -145,6 +154,7 @@ RV_indices.sort()
 # Later in step 2 only the specific steps will be extracted
 #====================================================================
 # load already prepared 7days mean 1979-2016 time series
+path_input = '/Users/semvijverberg/surfdrive/Circulation-Regimes/input/'
 mt_rain =  Dataset('/p/projects/gotham/giorgia/Rainfall/prcp_GLB_daily_1979-2016_del29feb.75-88E_18-25N.7days.nc')
 MT_rain = mt_rain.variables['prcp'][:,:,:].squeeze()
 MT_rain.shape

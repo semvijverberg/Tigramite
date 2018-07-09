@@ -33,7 +33,7 @@ import sklearn
 import sys, os
 
 # add my own python functions
-sys.path.append('/Users/semvijverberg/PycharmProjects/Tigramite/')
+sys.path.append('/Users/semvijverberg/surfdrive/VU_Amsterdam/Scripts/Tigramite')
 #%%
 #import tigramite
 from tigramite import data_processing as pp
@@ -43,7 +43,7 @@ from tigramite.models import LinearMediation, Prediction
 from tigramite.independence_tests import ParCorr, GPDC, CMIknn, CMIsymb
 
 # import Marlene's RGCPD functions
-import RGCPD_functions_version_03 as rgcpd
+import RGCPD_functions_version_03_python3 as rgcpd
 
 import statsmodels.api as sm
 from sklearn import preprocessing
@@ -66,17 +66,17 @@ n_years = 38
 timeperiod = '1979-2016'
 # time-cycle of data
 # 12 for 7days, 365 for daily etc...
-time_cycle = 52
+time_cycle = 365
 
 # if complete time-series should be considered, n_steps = time-cycle
 # if only specific time-steps are considered (e.g. DJF then n-step = 3), n_steps says how many:
 
-n_steps = 17 # days of the summer season # means that 5 months out of the 12 are considered
+n_steps = 62 # days of the summer season # means that 5 months out of the 12 are considered
 
  
 # Start month is index of first relevant time-step
 # start_day = time-cycle, if alls values of the years should be considered
-start_day = 22 # means start with November (= 10ther entry in array), pythonic counting
+start_day = 150 # means start with November (= 10ther entry in array), pythonic counting
 
 seas_indices = range(n_steps)
 
@@ -113,7 +113,7 @@ m = Basemap(projection='hammer',lon_0 = 0 ,resolution='c')
 lag_steps = lag_max - lag_min +1
 time_range_all = [0, time_cycle * n_years]
 RV_indices = []
-
+#%%
 # case 1) complete time-series
 # cut-off the first year
 if n_steps == time_cycle:
@@ -261,7 +261,7 @@ pcA_set4 = [ 0.5, 0.4, 0.3, 0.2, 0.1] # set4
 
 for p in [0,]:#range(7):
         
-    print( ' run tigramite 3, run.pcmci')
+    print(' run tigramite 3, run.pcmci')
     print(p)
     '''
     save output
@@ -457,7 +457,7 @@ for p in [0,]:#range(7):
             print(fulldata[:,index_in_fulldata].size)
             print(name)
         else :
-            print 'Index itself is also causal parent -> skipped' 
+            print('Index itself is also causal parent -> skipped')
             print('*******************              ***************************                ******************')
     
     if plot_all == True:
@@ -519,7 +519,7 @@ for p in [0,]:#range(7):
                 				
                     x = A_r.max() 
                 		
-                    print x
+                    print(x)
                     if x >= number_region:
                         A_number_region = np.zeros(A_r.shape)
                 			
@@ -555,7 +555,7 @@ for p in [0,]:#range(7):
                 print("count")
                 print(count)
             else :
-                print 'Index itself is also causal parent -> skipped' 
+                print('Index itself is also causal parent -> skipped')
                 print('*******************              ***************************                ******************')
         
         else:
