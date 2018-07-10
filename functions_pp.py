@@ -34,28 +34,42 @@ def kornshell_with_input(args):
 
 def preprocessing_ncdf(cls, grid_res, temporal_freq):
     import os
+    from netCDF4 import Dataset
+    from netCDF4 import num2date
+    import pandas as pd
     # Final input and output files
     infile = os.path.join(cls.path_input, cls.filename)
     tmpfile = os.path.join(cls.path_input, 'tmpfiles', 'tmp.nc')
     outfilename = cls.filename[:-3]+'.nc'.replace(cls.grid.replace('/','x'), '{}-{}'.format(grid_res,grid_res))
-    outfilename = outfilename.replace('oper', 'dt-{}days'.format(temporal_freq))
+    outfilename = outfilename.replace('oper', 'dt-{}days'.format(temporal_freq.astype('timedelta64[D]').astype(int)))
     outfile = os.path.join(cls.base_path, 'input_pp', outfilename)
     print infile + '\n'
     print outfile + '\n'
+    # check temporal frequency raw data
+    file_path = os.path.join(cls.path_input, cls.filename)
+    ncdf = Dataset(file_path)
+    numtime = ncdf.variables['time']
+    dates = pd.to_datetime(num2date(numtime[:2], units=numtime.units, calendar=numtime.calendar))
+    timesteps = int(temporal_freq / (dates[1] - dates[0]))
+    ncdf.close()
     # commands to homogenize data
-    convert_temp_freq = 'cdo timselmean,{} {} {}'.format(temporal_freq, infile, tmpfile)
+    convert_temp_freq = 'cdo timselmean,{} {} {}'.format(timesteps, infile, tmpfile)
     convert_time_axis = 'cdo setreftime,1900-01-01,0,1h -setcalendar,gregorian {} {}'.format(tmpfile, tmpfile)
     gridfile = os.path.join(cls.path_input, 'grids', 'lonlat_{}d_grid.txt'.format(grid_res))
     convert_grid = 'cdo remapbil,{} {} {}'.format(gridfile, tmpfile, outfile)
     args = [convert_temp_freq, convert_time_axis, convert_grid]
     kornshell_with_input(args)
+    return outfilename
     
-def import_array(cls):
+def import_array(cls, path='pp'):
     import os
     import xarray as xr
     from netCDF4 import num2date
     import pandas as pd
-    file_path = os.path.join(cls.path_input, cls.filename)
+    if path == 'pp':
+        file_path = os.path.join(cls.base_path, 'input_pp', cls.filename)
+    else:
+        file_path = os.path.join(cls.path_input, cls.filename)
     ncdf = xr.open_dataset(file_path, decode_cf=True, decode_coords=True, decode_times=False)
     marray = ncdf.to_array(file_path).rename(({file_path: cls.name.replace(' ', '_')}))
     numtime = marray['time']
@@ -64,5 +78,5 @@ def import_array(cls):
     print('temporal frequency \'dt\' is: \n{}'.format(dates_np[1]- dates_np[0]))
     marray['time'] = dates_np
     cls.dates_np = dates_np
-    return marray
+    return marray, cls
 
