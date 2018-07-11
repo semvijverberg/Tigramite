@@ -18,23 +18,27 @@ import_array = functions_pp.import_array
 
 
 # homogenize netcdf
+exp = 'exp1'
 grid_res = 2.5
 temporal_freq = np.timedelta64(5, 'D') 
 
+#%%
+# assign instance
+temperature = Variable(name='2_metre_temperature', dataset='ERA-i', var_cf_code='167.128', levtype='sfc', lvllist=0,
+                       startyear=1979, endyear=2017, startmonth=3, endmonth=9, grid='2.5/2.5', stream='oper', units='K')
+# Download variable to input_raw
+retrieve_ERA_i_field(temperature)
+# preprocess variable to input_pp_exp'expnumber'
+functions_pp.preprocessing_ncdf(temperature, grid_res, temporal_freq, exp)
+marray, temperature = functions_pp.import_array(temperature, path='pp')
+#marray
 #%%
 # assign instance
 sst = Variable(name='SST', dataset='ERA-i', var_cf_code='34.128', levtype='sfc', lvllist=0,
                        startyear=1979, endyear=2017, startmonth=3, endmonth=9, grid='2.5/2.5', stream='oper', units='K')
 # Download variable
 retrieve_ERA_i_field(sst)
-sst.filename = functions_pp.preprocessing_ncdf(sst, grid_res, temporal_freq)
-#%%
-# assign instance
-temperature = Variable(name='2_metre_temperature', dataset='ERA-i', var_cf_code='167.128', levtype='sfc', lvllist=0,
-                       startyear=1979, endyear=2017, startmonth=3, endmonth=9, grid='2.5/2.5', stream='oper', units='K')
-# Download variable
-retrieve_ERA_i_field(temperature)
-temperature.filename = functions_pp.preprocessing_ncdf(temperature, grid_res, temporal_freq)
+sst.filename_pp = functions_pp.preprocessing_ncdf(sst, grid_res, temporal_freq)
 
 
 
@@ -45,9 +49,7 @@ import os
 import subprocess
 runfile = os.path.join(script_dir, 'saving_repository_to_Github.sh')
 subprocess.call(runfile)
-
-exit()
-
+#%%
 
 
 
@@ -57,4 +59,14 @@ exit()
 
 
 
+# =============================================================================
+# Simple example of cdo commands within python by calling bash script
+# =============================================================================
+infile = os.path.join(temperature.base_path, 'input_raw', temperature.filename)
+outfile = os.path.join(temperature.base_path, 'input_pp', 'output.nc')
+#tmp = os.path.join(temperature.base_path, 'input_raw', temperature.filename)
+args1 = 'cdo timmean {} {}'.format(infile, outfile)
+#args2 = 'cdo setreftime,1900-01-01,0,1h -setcalendar,gregorian {} {} '.format(infile, outfile)
+args = [args1]
 
+functions_pp.kornshell_with_input(args)

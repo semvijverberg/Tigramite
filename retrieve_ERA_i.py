@@ -4,7 +4,7 @@ def retrieve_ERA_i_field(cls):
     from ecmwfapi import ECMWFDataServer
     import os
     server = ECMWFDataServer()
-    file_path = os.path.join(cls.path_input, cls.filename)
+    file_path = os.path.join(cls.path_raw, cls.filename)
     datestring = "/".join(cls.datelist_str)
     if cls.stream == "mnth" or cls.stream == "oper":
         time = "00:00:00/06:00:00/12:00:00/18:00:00"

@@ -2,9 +2,9 @@
 #%%
 import os
 os.chdir('/Users/semvijverberg/surfdrive/VU_Amsterdam/Scripts/Tigramite')
+script_dir = os.getcwd()
 import subprocess
-cwd = os.getcwd()
-runfile = os.path.join(cwd, 'saving_repository_to_Github.sh')
+runfile = os.path.join(script_dir, 'saving_repository_to_Github.sh')
 subprocess.call(runfile)
 #%%
 
@@ -25,7 +25,7 @@ from datetime import datetime
 import datetime
 from matplotlib.patches import Polygon
 import seaborn as sns
-import numpy
+import numpy as np
 
 from matplotlib import gridspec
 
@@ -57,13 +57,13 @@ file_type2 = ".png"
 SaveTF = False
 plot_all = True
 
-fig_path = '/Users/semvijverberg/surfdrive/Output_ERA/input/output_tigr_SST_T2m'
+fig_path = '/Users/semvijverberg/surfdrive/Data_ERAint/output/output_tigr_SST_T2m'
 
 #=====================================================================================
 # 0) Parameters which must be specified
 #=====================================================================================
 n_years = 38
-timeperiod = '1979-2016'
+timeperiod = '1979-2019'
 # time-cycle of data
 # 12 for 7days, 365 for daily etc...
 time_cycle = 52
@@ -153,7 +153,8 @@ RV_indices.sort()
 # index is defined over all time-steps. 
 # Later in step 2 only the specific steps will be extracted
 #====================================================================
-# load already prepared 7days mean 1979-2016 time series
+# load preprocessed predictant
+#np.ma.make_mask(clusters.sel(cluster=0)>1*clusters.sel(cluster=0).std())
 path_input = '/Users/semvijverberg/surfdrive/Circulation-Regimes/input/'
 mt_rain =  Dataset('/p/projects/gotham/giorgia/Rainfall/prcp_GLB_daily_1979-2016_del29feb.75-88E_18-25N.7days.nc')
 MT_rain = mt_rain.variables['prcp'][:,:,:].squeeze()

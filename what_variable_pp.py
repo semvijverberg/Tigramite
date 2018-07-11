@@ -21,11 +21,11 @@ class Variable:
 
     ecmwf_website = 'http://apps.ecmwf.int/codes/grib/param-db'
     base_path = "/Users/semvijverberg/surfdrive/Data_ERAint/"
-    path_input = os.path.join(base_path, 'input_raw')
-    if os.path.isdir(path_input):
+    path_raw = os.path.join(base_path, 'input_raw')
+    if os.path.isdir(path_raw):
         pass
     else:
-        os.makedirs(path_input)
+        os.makedirs(path_raw)
     def __init__(self, name, dataset, var_cf_code, levtype, lvllist, startyear, endyear, startmonth, endmonth, grid, stream, units):
         # self is the instance of the employee class
         # below are listed the instance variables
