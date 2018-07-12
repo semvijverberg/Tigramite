@@ -8,7 +8,6 @@ git commit -m "Default"
 git push -u
 git status
 
-mkdir funnydir
 exit
 
 # git remote -v

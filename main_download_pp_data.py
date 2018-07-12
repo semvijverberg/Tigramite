@@ -16,40 +16,43 @@ Variable = what_variable_pp.Variable
 retrieve_ERA_i_field = retrieve_ERA_i.retrieve_ERA_i_field
 import_array = functions_pp.import_array
 
-
 # homogenize netcdf
-exp = 'exp1'
-grid_res = 2.5
-days = 5
-temporal_freq = np.timedelta64(days, 'D') 
+exp = dict(
+     {'exp'          :       'exp1',
+     'dataset'       :       'ERA-i',
+     'grid_res'      :       2.5,
+     'tfreq'         :       20,
+     'startyear'     :       1979,
+     'endyear'       :       2017,
+     'startmonth'    :       3,
+     'endmonth'      :       9,
+     'vars'          :      [['t2m', 'sst'],['167.128', '34.128'],['sfc', 'sfc'],[0, 0]]}
+     )
+
 
 #%%
 # assign instance
-temperature = Variable(name='2_metre_temperature', dataset='ERA-i', var_cf_code='167.128', levtype='sfc', lvllist=0,
-                       startyear=1979, endyear=2017, startmonth=3, endmonth=9, grid='2.5/2.5', stream='oper', units='K')
-# Download variable to input_raw
-retrieve_ERA_i_field(temperature)
-# preprocess variable to input_pp_exp'expnumber'
-functions_pp.preprocessing_ncdf(temperature, grid_res, temporal_freq, exp)
-marray, temperature = functions_pp.import_array(temperature, path='pp')
-#marray
-#%%
-# assign instance
-sst = Variable(name='SST', dataset='ERA-i', var_cf_code='34.128', levtype='sfc', lvllist=0,
-                       startyear=1979, endyear=2017, startmonth=3, endmonth=9, grid='2.5/2.5', stream='oper', units='K')
-# Download variable
-retrieve_ERA_i_field(sst)
-functions_pp.preprocessing_ncdf(sst, grid_res, temporal_freq, exp)
+for idx in range(len(exp['vars'][0])):
+    print idx    
+    var_class = ( Variable(name=exp['vars'][0][idx], dataset='ERA-i', var_cf_code=exp['vars'][1][idx], 
+                       levtype=exp['vars'][2][idx], lvllist=exp['vars'][3][idx], startyear=exp['startyear'], 
+                       endyear=exp['endyear'], startmonth=exp['startmonth'], endmonth=exp['endmonth'], 
+                       grid=exp['grid_res'], stream='oper') )
+    exp[exp['vars'][0][idx]] = var_class
+    retrieve_ERA_i_field(var_class)
+    functions_pp.preprocessing_ncdf(var_class, exp['grid_res'], exp['tfreq'], exp['exp'])
+    
 
-#%%
+
+#%%  
 # =============================================================================
-# Experiment design
+# Save Experiment design
 # =============================================================================
-exp1_dic = dict( {'predictant':temperature} )
-
-np.save(os.path.join(temperature.path_pp, 'exp1_dic.npy'), [temperature, sst])
-np.save(os.path.join(temperature.path_pp, 'exp1_dic.npy'), exp1_dic)
-
+RV = exp[exp['vars'][0][0]]
+np.save(os.path.join(RV.path_pp, exp['exp']+'_dic.npy'), exp)
+#list = np.load(os.path.join(temperature.path_pp, 'exp1_dic.npy')).item()
+#np.save(os.path.join(temperature.path_pp, 'exp1_dic.npy'), exp1_dic)
+test = np.load(os.path.join(RV.path_pp, exp['exp']+'_dic.npy')).item()
 
 
 
@@ -65,10 +68,26 @@ subprocess.call(runfile)
 
 
 
+ depricated
+#%%
+temperature = Variable(name=exp['vars'][0][0], dataset='ERA-i', var_cf_code='167.128', levtype='sfc', lvllist=0,
+                       startyear=1979, endyear=2017, startmonth=3, endmonth=9, grid=exp['grid_res'], stream='oper', units='K')
+# Download variable to input_raw
+retrieve_ERA_i_field(temperature)
+# preprocess variable to input_pp_exp'expnumber'
+functions_pp.preprocessing_ncdf(temperature, exp['grid_res'], exp['tfreq'], exp['exp'])
+marray, temperature = functions_pp.import_array(temperature, path='pp')
+#marray
+#%%
+# assign instance
+sst = Variable(name='sst', dataset='ERA-i', var_cf_code='34.128', levtype='sfc', lvllist=0,
+                       startyear=1979, endyear=2017, startmonth=3, endmonth=8, grid=exp['grid_res'], stream='oper')
+# Download variable
+retrieve_ERA_i_field(sst)
+functions_pp.preprocessing_ncdf(sst, exp['grid_res'], exp['tfreq'], exp['exp'])
 
 
-
-
+#%%
 
 # =============================================================================
 # Simple example of cdo commands within python by calling bash script

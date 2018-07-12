@@ -15,7 +15,7 @@ def retrieve_ERA_i_field(cls):
 
 
     if os.path.isfile(path=file_path) == True:
-        print("You have already download the variable {} from {} to {} on grid {} ".format(cls.name, cls.startyear, cls.endyear, cls.grid))
+        print("You have already download the variable {} from {} to {} on grid {}d ".format(cls.name, cls.startyear, cls.endyear, cls.grid))
         print("\n to path: {} \n ".format(file_path))
         pass
     else:
@@ -29,7 +29,7 @@ def retrieve_ERA_i_field(cls):
                 "class"     :   "ei",
                 "expver"    :   "1",
                 "date"      :   datestring,
-                "grid"      :   cls.grid,
+                "grid"      :   '{}/{}'.format(cls.grid),
                 "levtype"   :   cls.levtype,
                 # "levelist"  :   cls.lvllist,
                 "param"     :   cls.var_cf_code,
@@ -45,7 +45,7 @@ def retrieve_ERA_i_field(cls):
                 "class"     :   "ei",
                 "expver"    :   "1",
                 "date"      :   datestring,
-                "grid"      :   cls.grid,
+                "grid"      :   '{}/{}'.format(cls.grid),
                 "levtype"   :   cls.levtype,
                 "levelist"  :   cls.lvllist,
                 "param"     :   cls.var_cf_code,

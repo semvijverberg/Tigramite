@@ -31,16 +31,17 @@ def kornshell_with_input(args):
     return
 
 
-def preprocessing_ncdf(cls, grid_res, temporal_freq, exp):
+def preprocessing_ncdf(cls, grid_res, tfreq, exp):
     import os
     from netCDF4 import Dataset
     from netCDF4 import num2date
     import pandas as pd
+    import numpy as np
     # Final input and output files
     infile = os.path.join(cls.path_raw, cls.filename)
     tmpfile = os.path.join(cls.path_raw, 'tmpfiles', 'tmp.nc')
-    outfilename = cls.filename[:-3]+'.nc'.replace(cls.grid.replace('/','x'), '{}-{}'.format(grid_res,grid_res))
-    outfilename = outfilename.replace('oper', 'dt-{}days'.format(temporal_freq.astype('timedelta64[D]').astype(int)))
+    outfilename = cls.filename[:-3]+'.nc'
+    outfilename = outfilename.replace('oper', 'dt-{}days'.format(tfreq))
     cls.path_pp = os.path.join(cls.base_path, 'input_pp_'+exp)
     outfile = os.path.join(cls.path_pp, outfilename)
     print infile + '\n'
@@ -50,14 +51,12 @@ def preprocessing_ncdf(cls, grid_res, temporal_freq, exp):
     ncdf = Dataset(file_path)
     numtime = ncdf.variables['time']
     dates = pd.to_datetime(num2date(numtime[:2], units=numtime.units, calendar=numtime.calendar))
+    temporal_freq = np.timedelta64(tfreq, 'D') 
     timesteps = int(temporal_freq / (dates[1] - dates[0]))
     
     variables = ncdf.variables.keys()
     [var for var in variables if var not in 'longitude time latitude']    
     # commands to homogenize data
-# =============================================================================
-#     build in cdo selmon?
-# =============================================================================
     convert_temp_freq = 'cdo timselmean,{} {} {}'.format(timesteps, infile, outfile)
     echo_tfreq = 'echo '+convert_temp_freq
     # problem with remapping, ruins the time coordinates
@@ -67,17 +66,26 @@ def preprocessing_ncdf(cls, grid_res, temporal_freq, exp):
 #    convert_grid = 'cdo remapnn,{} {} {}'.format(cdo_gridfile, outfile, outfile)
 #    selmon = 'cdo selmon,3,9 
 #    overwrite_taxis =   'cdo settaxis,{},1month {} {}'.format(starttime.strftime('%Y-%m-%d,%H:%M'), tmpfile, tmpfile)
-    convert_time_axis = 'cdo setreftime,1900-01-01,00:00:00 -setcalendar,gregorian {} {}'.format(tmpfile, tmpfile)
-    rm_timebnds = 'ncks -O -C -x -v time_bnds {} {}'.format(tmpfile, tmpfile)
-    rm_res_timebnds = 'ncpdq -O {} {}'.format(tmpfile, tmpfile)
-    add_path_raw = 'ncatted -a path_raw,global,c,c,{} {}'.format(str(ncdf.filepath()), tmpfile) 
+    convert_time_axis = 'cdo setreftime,1900-01-01,00:00:00 -setcalendar,gregorian {} {}'.format(outfile, outfile)
+    rm_timebnds = 'ncks -O -C -x -v time_bnds {} {}'.format(outfile, outfile)
+    rm_res_timebnds = 'ncpdq -O {} {}'.format(outfile, outfile)
+    add_path_raw = 'ncatted -a path_raw,global,c,c,{} {}'.format(str(ncdf.filepath()), outfile) 
     add_units = 'ncatted -a units,global,c,c,{} {}'.format(ncdf.variables[var].units, outfile) 
+    detrend = 'cdo -b 32 detrend {} {}'.format(outfile, outfile)
+    clim = 'cdo ydaymean {} {}'.format(outfile, tmpfile)
+    anom = 'cdo -b 32 ydaysub {} {} {}'.format(outfile, tmpfile, outfile) 
     ncdf.close()
     # ORDER of commands, --> is important!
 #    args = [echo_tfreq, convert_temp_freq , convert_grid]
     args = [echo_tfreq, convert_temp_freq, convert_time_axis, rm_timebnds, rm_res_timebnds, 
-            add_path_raw, add_units] 
+            add_path_raw, add_units, detrend, clim, anom] 
     kornshell_with_input(args)
+    # update class
+    file_path = os.path.join(cls.path_raw, cls.filename)
+    ncdf = Dataset(file_path)
+    numtime = ncdf.variables['time']
+    dates = pd.to_datetime(num2date(numtime[:], units=numtime.units, calendar=numtime.calendar))
+    cls.dates_np = dates
     cls.filename_pp = outfilename
     cls.tfreq = '{}days'.format(temporal_freq.astype('timedelta64[D]').astype(int))
     return 

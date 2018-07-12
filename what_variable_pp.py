@@ -26,7 +26,7 @@ class Variable:
         pass
     else:
         os.makedirs(path_raw)
-    def __init__(self, name, dataset, var_cf_code, levtype, lvllist, startyear, endyear, startmonth, endmonth, grid, stream, units):
+    def __init__(self, name, dataset, var_cf_code, levtype, lvllist, startyear, endyear, startmonth, endmonth, grid, stream):
         # self is the instance of the employee class
         # below are listed the instance variables
         self.name = name
@@ -39,7 +39,6 @@ class Variable:
         self.endmonth = endmonth
         self.grid = grid
         self.stream = stream
-        self.units = units
         self.dataset = dataset
         if stream == 'oper':
             time_ana = "00:00:00/06:00:00/12:00:00/18:00:00"
@@ -73,10 +72,10 @@ class Variable:
         self.datelist_str = datelist_str
 
         # Convert to datetime datelist
-        self.dates_dt = [Variable.datetime.strptime(date, '%Y-%m-%d').date() for date in datelist_str]
+#        self.dates_dt = [Variable.datetime.strptime(date, '%Y-%m-%d').date() for date in datelist_str]
         self.dates_np = Variable.pd.to_datetime(datelist_str)
 
-        filename = '{}_{}-{}_{}_{}_{}_{}'.format(self.name, self.startyear, self.endyear, self.startmonth, self.endmonth, self.stream, self.grid).replace(' ', '_').replace('/','x')
+        filename = '{}_{}-{}_{}_{}_{}_{}deg'.format(self.name, self.startyear, self.endyear, self.startmonth, self.endmonth, self.stream, self.grid).replace(' ', '_')
         self.filename = filename +'.nc'
         print("Variable function selected {} \n".format(self.filename))
 

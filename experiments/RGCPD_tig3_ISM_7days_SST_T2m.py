@@ -7,16 +7,17 @@ subprocess.call(runfile)
 #%%
 import os
 os.chdir('/Users/semvijverberg/surfdrive/Scripts/Tigramite/experiments/')
-import what_input 
+import functions_tig 
 import pandas as pd
-from netCDF4 import num2date
+import xarray as xr
+
 exp = 'exp1'
-Variable = what_input.Variable
+Variable = functions_tig.Variable
 # Import classes
-#predic = Variable(name='2_metre_temperature', dataset='ERA-i', startyear=1979, endyear=2017, 
-#                       startmonth=3, endmonth=9, tfreq=5, grid='2.5/2.5', exp=exp)
-act1 = Variable(name='SST', dataset='ERA-i', startyear=1979, endyear=2017, 
-                       startmonth=1, endmonth=12, tfreq=5, grid='2.5/2.5', exp=exp)
+RV = Variable(name='2_metre_temperature', dataset='ERA-i', startyear=1979, endyear=2017, 
+                       startmonth=3, endmonth=9, tfreq=20, grid='2.5/2.5', exp=exp)
+act1 = Variable(name='sst', dataset='ERA-i', startyear=1979, endyear=2017, 
+                       startmonth=3, endmonth=9, tfreq=20, grid='2.5/2.5', exp=exp)
 #%%
 import matplotlib
 matplotlib.rcParams['backend'] = "Qt4Agg"
@@ -24,6 +25,7 @@ matplotlib.rcParams['backend'] = "Qt4Agg"
 from pylab import *
 from mpl_toolkits.basemap import Basemap, shiftgrid, cm
 from netCDF4 import Dataset
+from netCDF4 import num2date
 from netcdftime import utime
 from datetime import datetime, date, timedelta
 from matplotlib.dates import YearLocator, MonthLocator, DateFormatter
@@ -34,6 +36,7 @@ from scipy import signal
 from datetime import datetime 
 import datetime
 from matplotlib.patches import Polygon
+import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 
@@ -74,29 +77,11 @@ fig_path = '/Users/semvijverberg/surfdrive/Data_ERAint/output/output_tigr_SST_T2
 #=====================================================================================
 # 0) Parameters which must be specified
 #=====================================================================================
-file_path = os.path.join(predic.path_pp, predic.filename)
+file_path = os.path.join(RV.path_pp, RV.filename_pp)
 ncdf = Dataset(file_path)
 numtime = ncdf.variables['time']
 dates = pd.to_datetime(num2date(numtime[:], units=numtime.units, calendar=numtime.calendar))
 #%%
-n_years = dates.year.max() - dates.year.min() 
-timeperiod = '{}-{}'.format(predic.startyear, predic.endyear)
-# time-cycle of data
-# 12 for 7days, 365 for daily etc...
-time_cycle = 365/predic.tfreq
-
-# if complete time-series should be considered, n_steps = time-cycle
-# if only specific time-steps are considered (e.g. DJF then n-step = 3), n_steps says how many:
-
-n_steps = predic.endmonth - predic.startmonth # days of the summer season 
-
- 
-# Start month is index of first relevant time-step
-# start_day = time-cycle, if alls values of the years should be considered
-start_day = 0 # means start with November (= 10ther entry in array), pythonic counting
-
-seas_indices = range(n_steps)
-
 # significnace level for correlation maps
 alpha = 0.01 #  try different values 0.001, 0.005, 0.05, 0.1
 alpha_fdr = 2*alpha
@@ -104,16 +89,14 @@ alpha_fdr = 2*alpha
 alpha_level_vec = [0.1, 0.3, 0.9, 0.9]
 # which is the minimum lag whoch should be considered
 
-
 lag_min = 1
-lag_max = 2 # should be <time_cycle
+lag_max = 3 # should be <time_cycle
+
 # select domain
 la_min = -89
 la_max = 89
 lo_min = -180
 lo_max = 360
-
-params_combination = ''.join([str(lag_min),'-',str(lag_max), '_months', str(start_day), '-', str(start_day+n_steps-1), '_alphaCorr',str(alpha)])
 
 
 
@@ -123,10 +106,25 @@ params_combination = ''.join([str(lag_min),'-',str(lag_max), '_months', str(star
 m = Basemap(projection='hammer',lon_0 = 0 ,resolution='c')
 #m = Basemap(llcrnrlon=-180,llcrnrlat=-89,urcrnrlon=180,urcrnrlat=85, projection='cea')
 
-
 #=====================================================================================
 # Calculates the indices which are taken for response-variable
 #=====================================================================================
+n_years = dates.year.max() - dates.year.min() 
+timeperiod = '{}-{}'.format(RV.startyear, RV.endyear)
+# time-cycle of data
+# 365 for daily etc...
+time_cycle = (dates.where(dates.year==RV.startyear).max() - dates.where(dates.year==RV.startyear).min()).days/RV.tfreq
+
+# if complete time-series should be considered, n_steps = time-cycle
+# if only specific time-steps are considered (e.g. DJF then n-step = 3), n_steps says how many:
+n_steps = 20# (dates.where(dates.year==RV.startyear).max() - dates.where(dates.year==RV.startyear).min()).days/RV.tfreq # days of the summer season 
+
+# Start month is index of first relevant time-step
+# start_day = time-cycle, if alls values of the years should be considered
+start_day = 20 # (= 10ther entry in array), pythonic counting
+
+seas_indices = range(n_steps)
+
 lag_steps = lag_max - lag_min +1
 time_range_all = [0, time_cycle * n_years]
 RV_indices = []
@@ -160,6 +158,8 @@ else:
 RV_indices.sort()
 
 
+params_combination = ''.join([str(lag_min),'-',str(lag_max), '_months', str(start_day), '-', str(start_day+n_steps-1), '_alphaCorr',str(alpha)])
+
 #%%
 #==================================================================================
 # 1) Define index of interest (here: Polar vortex index based on gph)
@@ -170,74 +170,59 @@ RV_indices.sort()
 # index is defined over all time-steps. 
 # Later in step 2 only the specific steps will be extracted
 #====================================================================
-# load preprocessed predictant
-#np.ma.make_mask(clusters.sel(cluster=0)>1*clusters.sel(cluster=0).std())
-path_input = '/Users/semvijverberg/surfdrive/Circulation-Regimes/input/'
-mt_rain =  Dataset('/p/projects/gotham/giorgia/Rainfall/prcp_GLB_daily_1979-2016_del29feb.75-88E_18-25N.7days.nc')
-MT_rain = mt_rain.variables['prcp'][:,:,:].squeeze()
-MT_rain.shape
+# load preprocessed predictant 
+# need xarray funtionality for a second
+RV_array = np.squeeze(functions_tig.import_array(RV))
+RV_array, region_coords = functions_tig.find_region(RV_array, region='U.S.')
+RV_array.shape
 #shear.shape     
-months , nlats, nlons = MT_rain.shape # [months , lat, lon]
-
+time , nlats, nlons = RV_array.shape # [months , lat, lon]
 #=====================================================================================
 # mean over longitude and latitude
-
-MT_rain1D = numpy.mean(MT_rain, axis = (1,2))
-
-#=====================================================================================
-# # detrend in each time-step	
-for j in range(time_cycle):
-    MT_rain1D[j::time_cycle] = scipy.signal.detrend(MT_rain1D[j::time_cycle], axis = 0)    
-    #MT_rain1D1[j::time_cycle] = scipy.signal.detrend(MT_rain1D1[j::time_cycle], axis = 0)
-
-#calculate anomalies 
-for i in range(int(time_cycle)):
-    MT_rain1D[i::int(time_cycle)] = (MT_rain1D[i::int(time_cycle)] - np.mean(MT_rain1D[:time_cycle*n_years][i::int(time_cycle)], axis = 0))	
-    #MT_rain1D1[i::int(time_cycle)] = (MT_rain1D1[i::int(time_cycle)] - np.mean(MT_rain1D1[:time_cycle*n_years][i::int(time_cycle)], axis = 0))	
-
+cluster = 2
+clusters = np.squeeze(xr.Dataset.from_dict(np.load(os.path.join(RV.path_pp, 'clusters_dic.npy')).item()).to_array())
+cluster_out = clusters.sel(cluster=cluster)
+functions_tig.xarray_plot(cluster_out)
+mask_RV = np.ma.masked_where(clusters.sel(cluster=0)<2*clusters.sel(cluster=0).std(), RV_array.isel(time=0))
+plt.imshow(mask_RV)
+RV_final = np.ma.array(cluster_out.values, mask = mask_RV.mask)
+RV_final = np.ma.mean(RV_array, axis = (1,2)).data
 #=====================================================================================
 # 2) extract specific months of MT index 
 #=====================================================================================
-
-MT_index = MT_rain1D[RV_indices]
-
-
-
+RV_index = RV_final[RV_indices]
 #=====================================================================================
-#
+
+#%%
+
+
 # 3) DEFINE PRECURSOS COMMUNITIES:
 # - calculate and plot pattern correltion for differnt fields
 # - create time-series over these regions 
-#
+
 #=====================================================================================
 
-
-
-
 #===========================================
-# 3c) Precursor field = v200
+# 3c) Precursor field = sst
 #===========================================
-v200 = Dataset('/p/projects/gotham/giorgia/ERA.interim/WIND.data/U_V200mb.1979-2016.daily.del29feb.7days.nc', 'r')
-V200 = v200.variables['var132'][:,:,:].squeeze() #/100 ??
-V200 = V200
-# # # detrend in each time-step	
-for j in range(time_cycle):
-	V200[j::time_cycle] = scipy.signal.detrend(V200[j::time_cycle], axis = 0)
-		
-#calculate anomalies
-for i in range(int(time_cycle)):
-    V200[i::int(time_cycle)] = (V200[i::int(time_cycle)] - np.mean(V200[:time_cycle*n_years][i::int(time_cycle)], axis = 0))
+ncdf_act1 = Dataset(os.path.join(act1.path_pp, act1.filename_pp), 'r')
+act1_array = ncdf_act1.variables['sst'][:,:,:].squeeze()    
+time , nlats, nlons = act1_array.shape # [months , lat, lon]
 
-
+# =============================================================================
+# Calculate correlation 
+# =============================================================================
 box = [la_min, la_max, lo_min, lo_max]
-
 # add rgcpd
-Corr_V200, lat_grid_v200, lon_grid_v200 = rgcpd.calc_corr_coeffs_new(v200, V200, box, MT_index,time_range_all, lag_min, lag_max,
+ncdf_act1 = Dataset(os.path.join(act1.path_pp, act1.filename_pp), 'r')
+act1_array = ncdf_act1.variables[act1.name][:,:,:].squeeze()
+Corr_act1, lat_grid_act1, lon_grid_act1 = rgcpd.calc_corr_coeffs_new(ncdf_act1, act1_array, box, RV_index,time_range_all, lag_min, lag_max,
                                                                   time_cycle, RV_indices, alpha_fdr, FDR_control=False)
 
 #plot
-fig_corr_V200 = rgcpd.plot_corr_coeffs(Corr_V200, m, lag_min, lat_grid_v200, lon_grid_v200,\
-		title= 'V200', Corr_mask=False)
+fig_corr_act1 = rgcpd.plot_corr_coeffs(Corr_act1, m, lag_min, lat_grid_act1, lon_grid_act1,\
+		title= act1.name, Corr_mask=False)
+#%%
   #plot
 #fig_corr_SLP = rgcpd.plot_corr_coeffs(Corr_SLP, m, lag_min, lat_grid_slp, lon_grid_slp,\#
 #		title= 'SLP', Corr_mask=True)
@@ -299,15 +284,16 @@ for p in [0,]:#range(7):
     #Act_slp = Actors_SLP[:,int(np.sum(n_reg_perlag_SLP[:tau_min - lag_min ])):]
     
     # stack actor time-series together:
-    fulldata = Act_v200#numpy.concatenate((Act_v200), axis = 1)
+    # if more then one actor, then concatenate them into fulldata
+    fulldata = Act_v200#np.concatenate((Act_v200), axis = 1)
     
     # add index of interest as first entry (here PCH):
-    fulldata = numpy.column_stack((MT_rain1D, fulldata))
+    fulldata = np.column_stack((MT_rain1D, fulldata))
     # save fulldata
     file_name = ''.join([ params_combination, '_fulldata'])#,'.pdf' ])
     fulldata.dump(''.join([fig_path, file_name]))  
     
-    # create arry which contains number of region and variable name for each entry in fulldata:
+    # create array which contains number of region and variable name for each entry in fulldata:
     var_V200 = [[i+1, 'V200', 0] for i in range(Act_v200.shape[1])]
     #var_SLP = [[i+1, 'SLP', 1] for i in range(Act_slp.shape[1])]
     
@@ -316,7 +302,7 @@ for p in [0,]:#range(7):
         
     
     file_name = ''.join(['_maps.lag', params_combination, '_var_name'])#,'.pdf' ])
-    var_names_np = numpy.asanyarray(var_names)
+    var_names_np = np.asanyarray(var_names)
     var_names_np.dump(''.join([fig_path, file_name]))  
        
       
@@ -332,9 +318,11 @@ for p in [0,]:#range(7):
     # ======================================================================================================================
     print(data.shape)
     
-    data_mask = np.ones(data.shape, dtype='bool')
+    data_mask = np.ones(data.shape, dtype='bool') # true for actor months, false for RV months
     for i in range(4): # take into account 4 months starting from june=5
         data_mask[5+i:: 12,:] = False # [22+i:: 52,:]
+#    for i in range(n_steps): # take into account 4 months starting from june=5
+#        data_mask[start_day+i:: time_cycle,:] = False # [22+i:: 52,:]
     ##
     T, N = data.shape
     
@@ -359,7 +347,7 @@ for p in [0,]:#range(7):
         dataframe=dataframe, 
         cond_ind_test=parcorr,
         var_names=var_names,
-        selected_variables=None, #[0], # only parents for the monsoon trough rainfall
+        selected_variables=None, # consider precursor only of RV variable, then selected_variables should be None
         verbosity=2)
         
     # ======================================================================================================================
@@ -518,7 +506,7 @@ for p in [0,]:#range(7):
                 lag_steps = Corr_GPH.shape[1]
                 la_gph = lat_grid_gph.shape[0]
                 lo_gph = lon_grid_gph.shape[0]
-                lons_gph, lats_gph = numpy.meshgrid(lon_grid_gph, lat_grid_gph)
+                lons_gph, lats_gph = np.meshgrid(lon_grid_gph, lat_grid_gph)
                  	
                 cmap_regions = matplotlib.colors.ListedColormap(sns.color_palette("Set2"))
                 cmap_regions.set_bad('w')
@@ -530,10 +518,10 @@ for p in [0,]:#range(7):
                     Regions_lag_i = rgcpd.define_regions_and_rank_new(Corr_GPH[:,i], lat_grid_gph, lon_grid_gph)
                     n_regions_lag_i = int(Regions_lag_i.max())
                 		
-                    x_reg = numpy.max(Regions_lag_i)	
-                    levels = numpy.arange(x, x + x_reg +1)+.5
+                    x_reg = np.max(Regions_lag_i)	
+                    levels = np.arange(x, x + x_reg +1)+.5
                 
-                    A_r = numpy.reshape(Regions_lag_i, (la_gph, lo_gph))
+                    A_r = np.reshape(Regions_lag_i, (la_gph, lo_gph))
                     A_r = A_r + x
                 				
                     x = A_r.max() 
