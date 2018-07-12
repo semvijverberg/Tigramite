@@ -81,12 +81,12 @@ def preprocessing_ncdf(cls, grid_res, tfreq, exp):
             add_path_raw, add_units, detrend, clim, anom] 
     kornshell_with_input(args)
     # update class
-    file_path = os.path.join(cls.path_raw, cls.filename)
+    cls.filename_pp = outfilename
+    file_path = os.path.join(cls.path_pp, cls.filename_pp)
     ncdf = Dataset(file_path)
     numtime = ncdf.variables['time']
     dates = pd.to_datetime(num2date(numtime[:], units=numtime.units, calendar=numtime.calendar))
     cls.dates_np = dates
-    cls.filename_pp = outfilename
     cls.tfreq = '{}days'.format(temporal_freq.astype('timedelta64[D]').astype(int))
     return 
     
