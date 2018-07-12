@@ -68,7 +68,7 @@ subprocess.call(runfile)
 
 
 
- depricated
+# depricated
 #%%
 temperature = Variable(name=exp['vars'][0][0], dataset='ERA-i', var_cf_code='167.128', levtype='sfc', lvllist=0,
                        startyear=1979, endyear=2017, startmonth=3, endmonth=9, grid=exp['grid_res'], stream='oper', units='K')
