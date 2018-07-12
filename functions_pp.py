@@ -51,21 +51,32 @@ def preprocessing_ncdf(cls, grid_res, temporal_freq, exp):
     numtime = ncdf.variables['time']
     dates = pd.to_datetime(num2date(numtime[:2], units=numtime.units, calendar=numtime.calendar))
     timesteps = int(temporal_freq / (dates[1] - dates[0]))
+    
     variables = ncdf.variables.keys()
     [var for var in variables if var not in 'longitude time latitude']    
     # commands to homogenize data
-    convert_temp_freq = 'cdo timselmean,{} {} {}'.format(timesteps, infile, tmpfile)
-    convert_time_axis = 'cdo setreftime,1900-01-01,0,1h -setcalendar,gregorian {} {}'.format(tmpfile, tmpfile)
-    gridfile = os.path.join(cls.path_raw, 'grids', 'lonlat_{}d_grid.txt'.format(grid_res))
+# =============================================================================
+#     build in cdo selmon?
+# =============================================================================
+    convert_temp_freq = 'cdo timselmean,{} {} {}'.format(timesteps, infile, outfile)
+    echo_tfreq = 'echo '+convert_temp_freq
+    # problem with remapping, ruins the time coordinates
+#    gridfile = os.path.join(cls.path_raw, 'grids', 'landseamask_{}deg.nc'.format(grid_res))
+#    convert_grid = 'ncks -O --map={} {} {}'.format(gridfile, outfile, outfile)
+#    cdo_gridfile = os.path.join(cls.path_raw, 'grids', 'lonlat_{}d_grid.txt'.format(grid_res))
+#    convert_grid = 'cdo remapnn,{} {} {}'.format(cdo_gridfile, outfile, outfile)
+#    selmon = 'cdo selmon,3,9 
+#    overwrite_taxis =   'cdo settaxis,{},1month {} {}'.format(starttime.strftime('%Y-%m-%d,%H:%M'), tmpfile, tmpfile)
+    convert_time_axis = 'cdo setreftime,1900-01-01,00:00:00 -setcalendar,gregorian {} {}'.format(tmpfile, tmpfile)
     rm_timebnds = 'ncks -O -C -x -v time_bnds {} {}'.format(tmpfile, tmpfile)
     rm_res_timebnds = 'ncpdq -O {} {}'.format(tmpfile, tmpfile)
-#    add_glb_attrs = 'ncra -O --glb path_raw={} --glb units={} {} {}'.format('test', 'K', tmpfile, tmpfile)
     add_path_raw = 'ncatted -a path_raw,global,c,c,{} {}'.format(str(ncdf.filepath()), tmpfile) 
-    add_units = 'ncatted -a units,global,c,c,{} {}'.format(ncdf.variables[var].units, tmpfile) 
-    convert_grid = 'cdo remapbil,{} {} {}'.format(gridfile, tmpfile, outfile)
+    add_units = 'ncatted -a units,global,c,c,{} {}'.format(ncdf.variables[var].units, outfile) 
     ncdf.close()
     # ORDER of commands, --> is important!
-    args = [convert_temp_freq, convert_time_axis, rm_timebnds, rm_res_timebnds, add_path_raw, add_units, convert_grid] 
+#    args = [echo_tfreq, convert_temp_freq , convert_grid]
+    args = [echo_tfreq, convert_temp_freq, convert_time_axis, rm_timebnds, rm_res_timebnds, 
+            add_path_raw, add_units] 
     kornshell_with_input(args)
     cls.filename_pp = outfilename
     cls.tfreq = '{}days'.format(temporal_freq.astype('timedelta64[D]').astype(int))

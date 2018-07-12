@@ -8,15 +8,13 @@ subprocess.call(runfile)
 import os
 os.chdir('/Users/semvijverberg/surfdrive/Scripts/Tigramite/experiments/')
 import what_input 
-import pandas as pd
-from netCDF4 import num2date
 exp = 'exp1'
 Variable = what_input.Variable
 # Import classes
-#predic = Variable(name='2_metre_temperature', dataset='ERA-i', startyear=1979, endyear=2017, 
-#                       startmonth=3, endmonth=9, tfreq=5, grid='2.5/2.5', exp=exp)
+predic = Variable(name='2_metre_temperature', dataset='ERA-i', startyear=1979, endyear=2017, 
+                       startmonth=3, endmonth=9, tfreq=5, grid='2.5/2.5', exp=exp)
 act1 = Variable(name='SST', dataset='ERA-i', startyear=1979, endyear=2017, 
-                       startmonth=1, endmonth=12, tfreq=5, grid='2.5/2.5', exp=exp)
+                       startmonth=3, endmonth=9, tfreq=5, grid='2.5/2.5', exp=exp)
 #%%
 import matplotlib
 matplotlib.rcParams['backend'] = "Qt4Agg"
@@ -74,12 +72,7 @@ fig_path = '/Users/semvijverberg/surfdrive/Data_ERAint/output/output_tigr_SST_T2
 #=====================================================================================
 # 0) Parameters which must be specified
 #=====================================================================================
-file_path = os.path.join(predic.path_pp, predic.filename)
-ncdf = Dataset(file_path)
-numtime = ncdf.variables['time']
-dates = pd.to_datetime(num2date(numtime[:], units=numtime.units, calendar=numtime.calendar))
-#%%
-n_years = dates.year.max() - dates.year.min() 
+n_years = predic.endyear - predic.startyear 
 timeperiod = '{}-{}'.format(predic.startyear, predic.endyear)
 # time-cycle of data
 # 12 for 7days, 365 for daily etc...
@@ -88,12 +81,12 @@ time_cycle = 365/predic.tfreq
 # if complete time-series should be considered, n_steps = time-cycle
 # if only specific time-steps are considered (e.g. DJF then n-step = 3), n_steps says how many:
 
-n_steps = predic.endmonth - predic.startmonth # days of the summer season 
+n_steps = (predic.endmonth - predic.startmonth)+1 # days of the summer season # means that 5 months out of the 12 are considered
 
  
 # Start month is index of first relevant time-step
 # start_day = time-cycle, if alls values of the years should be considered
-start_day = 0 # means start with November (= 10ther entry in array), pythonic counting
+start_day = 22 # means start with November (= 10ther entry in array), pythonic counting
 
 seas_indices = range(n_steps)
 
@@ -160,7 +153,7 @@ else:
 RV_indices.sort()
 
 
-#%%
+
 #==================================================================================
 # 1) Define index of interest (here: Polar vortex index based on gph)
 #==================================================================================

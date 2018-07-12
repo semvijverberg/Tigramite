@@ -20,7 +20,8 @@ import_array = functions_pp.import_array
 # homogenize netcdf
 exp = 'exp1'
 grid_res = 2.5
-temporal_freq = np.timedelta64(5, 'D') 
+days = 5
+temporal_freq = np.timedelta64(days, 'D') 
 
 #%%
 # assign instance
@@ -38,7 +39,17 @@ sst = Variable(name='SST', dataset='ERA-i', var_cf_code='34.128', levtype='sfc',
                        startyear=1979, endyear=2017, startmonth=3, endmonth=9, grid='2.5/2.5', stream='oper', units='K')
 # Download variable
 retrieve_ERA_i_field(sst)
-sst.filename_pp = functions_pp.preprocessing_ncdf(sst, grid_res, temporal_freq)
+functions_pp.preprocessing_ncdf(sst, grid_res, temporal_freq, exp)
+
+#%%
+# =============================================================================
+# Experiment design
+# =============================================================================
+exp1_dic = dict( {'predictant':temperature} )
+
+np.save(os.path.join(temperature.path_pp, 'exp1_dic.npy'), [temperature, sst])
+np.save(os.path.join(temperature.path_pp, 'exp1_dic.npy'), exp1_dic)
+
 
 
 
