@@ -1,6 +1,7 @@
 
 
 def retrieve_ERA_i_field(cls):
+    from functions_pp import kornshell_with_input
     from ecmwfapi import ECMWFDataServer
     import os
     server = ECMWFDataServer()
@@ -19,8 +20,8 @@ def retrieve_ERA_i_field(cls):
         print("\n to path: {} \n ".format(file_path))
         pass
     else:
-        print(" You WILL download variable {} \n stream is set to {} \n all dates: {} \n".format \
-            (cls.name, cls.stream, datestring))
+        print(" You WILL download variable {} \n stream is set to {} \n".format \
+            (cls.name, cls.stream))
         print("\n to path: \n \n {} \n \n".format(file_path))
         # !/usr/bin/python
         if cls.levtype == 'sfc':
@@ -29,7 +30,7 @@ def retrieve_ERA_i_field(cls):
                 "class"     :   "ei",
                 "expver"    :   "1",
                 "date"      :   datestring,
-                "grid"      :   '{}/{}'.format(cls.grid),
+                "grid"      :   '{}/{}'.format(cls.grid,cls.grid),
                 "levtype"   :   cls.levtype,
                 # "levelist"  :   cls.lvllist,
                 "param"     :   cls.var_cf_code,
@@ -45,7 +46,7 @@ def retrieve_ERA_i_field(cls):
                 "class"     :   "ei",
                 "expver"    :   "1",
                 "date"      :   datestring,
-                "grid"      :   '{}/{}'.format(cls.grid),
+                "grid"      :   '{}/{}'.format(cls.grid,cls.grid),
                 "levtype"   :   cls.levtype,
                 "levelist"  :   cls.lvllist,
                 "param"     :   cls.var_cf_code,
@@ -55,6 +56,9 @@ def retrieve_ERA_i_field(cls):
                 "format"    :   "netcdf",
                 "target"    :   file_path,
                 })
+        print("convert operational 6hrly data to daily means")
+        args = ['cdo daymean {} {}'.format(file_path.replace('daily','oper'), file_path)]
+        kornshell_with_input(args)
 
 
     return

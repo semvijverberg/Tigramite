@@ -79,7 +79,7 @@ def preprocessing_ncdf(cls, exp):
     outfilename = outfilename.replace('daily', 'dt-{}days'.format(exp['tfreq']))
     outfilename = outfilename.replace('_{}_'.format(exp['dstartmonth']),'_{}{}_'.format(start_day.day, start_day.month_name()[:3]))
     outfilename = outfilename.replace('_{}_'.format(exp['dendmonth']),'_{}{}_'.format(end_day.day, end_day.month_name()[:3]))
-    cls.path_pp = os.path.join(cls.base_path, exp['exp'], 'input_pp')
+    cls.path_pp = os.path.join(cls.base_path, 'input_pp_'+exp['exp'])
     if os.path.isdir(cls.path_pp):
         pass
     else:

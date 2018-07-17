@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 #%%
+import os
 script_dir = '/Users/semvijverberg/surfdrive/Scripts/Tigramite'
 import subprocess
 runfile = os.path.join(script_dir, 'saving_repository_to_Github.sh')
@@ -8,16 +9,15 @@ subprocess.call(runfile)
 import os
 os.chdir('/Users/semvijverberg/surfdrive/Scripts/Tigramite/experiments/')
 import functions_tig 
+import numpy as np
 import pandas as pd
 import xarray as xr
 
-exp = 'exp1'
-Variable = functions_tig.Variable
-# Import classes
-RV = Variable(name='2_metre_temperature', dataset='ERA-i', startyear=1979, endyear=2017, 
-                       startmonth=3, endmonth=9, tfreq=20, grid='2.5/2.5', exp=exp)
-act1 = Variable(name='sst', dataset='ERA-i', startyear=1979, endyear=2017, 
-                       startmonth=3, endmonth=9, tfreq=20, grid='2.5/2.5', exp=exp)
+exp_name = 'exp1'
+path = '/Users/semvijverberg/surfdrive/Data_ERAint/input_pp_exp1'
+fig_path = '/Users/semvijverberg/surfdrive/Data_ERAint/output/output_tigr_SST_T2m'
+exp = np.load(os.path.join(path, exp_name+'_dic.npy')).item()
+RV = exp['t2m']
 #%%
 import matplotlib
 matplotlib.rcParams['backend'] = "Qt4Agg"
@@ -38,7 +38,6 @@ import datetime
 from matplotlib.patches import Polygon
 import matplotlib.pyplot as plt
 import seaborn as sns
-import numpy as np
 
 from matplotlib import gridspec
 
@@ -72,15 +71,15 @@ file_type2 = ".png"
 SaveTF = False
 plot_all = True
 
-fig_path = '/Users/semvijverberg/surfdrive/Data_ERAint/output/output_tigr_SST_T2m'
-
-#=====================================================================================
+# =====================================================================================
 # 0) Parameters which must be specified
 #=====================================================================================
 file_path = os.path.join(RV.path_pp, RV.filename_pp)
 ncdf = Dataset(file_path)
 numtime = ncdf.variables['time']
 dates = pd.to_datetime(num2date(numtime[:], units=numtime.units, calendar=numtime.calendar))
+print("\nCheck if dates are correct, should be all same day acros years")
+dates[::dates[dates.year == 1979].size]
 #%%
 # significnace level for correlation maps
 alpha = 0.01 #  try different values 0.001, 0.005, 0.05, 0.1
@@ -127,35 +126,7 @@ seas_indices = range(n_steps)
 
 lag_steps = lag_max - lag_min +1
 time_range_all = [0, time_cycle * n_years]
-RV_indices = []
-
-# case 1) complete time-series
-# cut-off the first year
-if n_steps == time_cycle:
-	RV_indices = range(time_cycle*n_years)[time_cycle:]
-
-# case 2) starts with Jan or lag_max is in previous year:
-# cutoff the first year
-elif start_day - lag_max < 0: #5- 5 = 0 
-	for i in range(n_steps):
-		a = range(time_cycle*n_years)[time_cycle:][start_day +i::time_cycle]
-		RV_indices = RV_indices + a
-
-#case 3) winter overlap DJ
-# cut-off last year except winter
-elif start_day + n_steps >=time_cycle: #5+4 =9
-	for i in range(n_steps):
-		a = range(time_cycle*n_years)[:-(start_day + n_steps -time_cycle)][start_day +i::time_cycle]
-		RV_indices = RV_indices + a
-
-#case 4) all good.
-else:
-	for i in range(n_steps):
-		a = range(time_cycle*n_years)[start_day +i::time_cycle]
-		RV_indices = RV_indices + a
-
-	
-RV_indices.sort()
+RV_indices = exp['RV_period']
 
 
 params_combination = ''.join([str(lag_min),'-',str(lag_max), '_months', str(start_day), '-', str(start_day+n_steps-1), '_alphaCorr',str(alpha)])
@@ -181,6 +152,7 @@ time , nlats, nlons = RV_array.shape # [months , lat, lon]
 # mean over longitude and latitude
 cluster = 2
 clusters = np.squeeze(xr.Dataset.from_dict(np.load(os.path.join(RV.path_pp, 'clusters_dic.npy')).item()).to_array())
+print 
 cluster_out = clusters.sel(cluster=cluster)
 functions_tig.xarray_plot(cluster_out)
 mask_RV = np.ma.masked_where(clusters.sel(cluster=0)<2*clusters.sel(cluster=0).std(), RV_array.isel(time=0))
