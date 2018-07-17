@@ -1,27 +1,7 @@
 # -*- coding: utf-8 -*-
 #%%
-import os
-script_dir = '/Users/semvijverberg/surfdrive/Scripts/Tigramite'
-import subprocess
-runfile = os.path.join(script_dir, 'saving_repository_to_Github.sh')
-subprocess.call(runfile)
-#%%
-import os
-os.chdir('/Users/semvijverberg/surfdrive/Scripts/Tigramite/experiments/')
-import functions_tig 
-import numpy as np
-import pandas as pd
-import xarray as xr
-
-exp_name = 'exp1'
-path = '/Users/semvijverberg/surfdrive/Data_ERAint/input_pp_exp1'
-fig_path = '/Users/semvijverberg/surfdrive/Data_ERAint/output/output_tigr_SST_T2m'
-exp = np.load(os.path.join(path, exp_name+'_dic.npy')).item()
-RV = exp['t2m']
-#%%
 import matplotlib
 matplotlib.rcParams['backend'] = "Qt4Agg"
-
 from pylab import *
 from mpl_toolkits.basemap import Basemap, shiftgrid, cm
 from netCDF4 import Dataset
@@ -29,8 +9,6 @@ from netCDF4 import num2date
 from netcdftime import utime
 from datetime import datetime, date, timedelta
 from matplotlib.dates import YearLocator, MonthLocator, DateFormatter
-import pandas
-from pandas import DataFrame
 import scipy
 from scipy import signal
 from datetime import datetime 
@@ -38,11 +16,29 @@ import datetime
 from matplotlib.patches import Polygon
 import matplotlib.pyplot as plt
 import seaborn as sns
-
 from matplotlib import gridspec
-
 import sklearn
 import sys, os
+import subprocess
+import functions_tig 
+import numpy as np
+import pandas as pd
+import xarray as xr
+
+script_dir = '/Users/semvijverberg/surfdrive/Scripts/Tigramite'
+runfile = os.path.join(script_dir, 'saving_repository_to_Github.sh')
+subprocess.call(runfile)
+#%%
+os.chdir('/Users/semvijverberg/surfdrive/Scripts/Tigramite/experiments/')
+
+
+exp_name = 'exp1'
+path = '/Users/semvijverberg/surfdrive/Data_ERAint/input_pp_exp1'
+fig_path = '/Users/semvijverberg/surfdrive/Data_ERAint/output/output_tigr_SST_T2m'
+exp = np.load(os.path.join(path, exp_name+'_dic.npy')).item()
+RV = exp['t2m']
+#%%
+
 
 # add my own python functions
 sys.path.append('/Users/semvijverberg/surfdrive/Scripts/Tigramite')

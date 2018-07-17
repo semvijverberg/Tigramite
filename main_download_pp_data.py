@@ -36,7 +36,7 @@ exp = dict(
 
 exp['sstartdate'] = '{}-5-1 09:00:00'.format(exp['startyear'])
 exp['senddate']   = '{}-8-31 09:00:00'.format(exp['startyear'])
-exp['exp'] = '{}_m{}-{}_dt{}'.format("_".join(exp['vars'][0]), 
+exp['exp_pp'] = '{}_m{}-{}_dt{}'.format("_".join(exp['vars'][0]), 
    exp['sstartdate'].split('-')[1], exp['senddate'].split('-')[1], exp['tfreq'])
 
 #%%
@@ -54,32 +54,10 @@ for idx in range(len(exp['vars'][0]))[:]:
 #    else:
 #        functions_pp.preprocessing_ncdf(var_class, exp)
     functions_pp.preprocessing_ncdf(var_class, exp)
-
-np.save(os.path.join(var_class.path_pp, exp['exp']+'_pp_dic.npy'), exp)
-test = np.load(os.path.join(var_class.path_pp, exp['exp']+'_dic.npy')).item()
-
-#%%
-# Select reponse variable period
-RV = exp[exp['vars'][0][1]]
-marray, RV = functions_pp.import_array(RV, path='pp')
-one_year = RV.dates_np.where(RV.dates_np.year == RV.startyear+1).dropna()
-months = [7,8]
-RV_period = []
-for mon in months:
-    RV_period.insert(-1, np.where(RV.dates_np.month == mon)[0] )
-RV_period = [x for sublist in RV_period for x in sublist]
-RV_period.sort()
-exp['RV_period'] = RV_period
-
-#%%  
 # =============================================================================
 # Save Experiment design
 # =============================================================================
-RV = exp[exp['vars'][0][0]]
-
-
-
-
+np.save(os.path.join(var_class.path_pp, exp['exp_pp']+'_pp_dic.npy'), exp)
 
 
 #%% save to github
@@ -87,20 +65,10 @@ import os
 import subprocess
 runfile = os.path.join(script_dir, 'saving_repository_to_Github.sh')
 subprocess.call(runfile)
-#%% check if days of year are alligned to be able to calculate a meaningful cdo ydaymean
-RV = exp['sst']
-marray, RV = functions_pp.import_array(RV, path='pp')
-time = marray.time.values
-for yr in range(exp['startyear'],exp['endyear']+1):
-    
-    one_year = RV.dates_np.where(RV.dates_np.year == yr).dropna()
-    print yr, len(one_year)
-    print one_year.dayofyear
-#%% Check if multi year mean is indeed 0
-#print exp['RV_period']
-plt.figure()
-one_date = marray.sel(time=RV.dates_np[RV_period[::4]])
-one_date.mean(dim='time')[0].plot.contourf()
+
+
+
+
 # depricated
 #%%
 idx = 0
