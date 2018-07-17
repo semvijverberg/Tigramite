@@ -6,26 +6,36 @@ os.chdir(script_dir)
 sys.path.append('/Users/semvijverberg/surfdrive/Scripts/Tigramite')
 import matplotlib
 matplotlib.rcParams['backend'] = "Qt4Agg"
-from mpl_toolkits.basemap import Basemap#, shiftgrid, cm
+from pylab import *
+from mpl_toolkits.basemap import Basemap, shiftgrid, cm
 from netCDF4 import Dataset
 from netCDF4 import num2date
+from netcdftime import utime
+from datetime import datetime, date, timedelta
+from matplotlib.dates import YearLocator, MonthLocator, DateFormatter
+import scipy
+from scipy import signal
+from datetime import datetime 
+import datetime
+from matplotlib.patches import Polygon
 import matplotlib.pyplot as plt
 import seaborn as sns
-from tigramite import data_processing as pp
-from tigramite.pcmci import PCMCI
-from tigramite.independence_tests import ParCorr, GPDC, CMIknn, CMIsymb
-import RGCPD_functions_version_03 as rgcpd
-#from tigramite import plotting as tp
-#from tigramite.models import LinearMediation, Prediction
-#import statsmodels.api as sm
-#from sklearn import preprocessing
-#from datetime import datetime, date, timedelta
-#from matplotlib.dates import YearLocator, MonthLocator, DateFormatter
-#import scipy
-#from scipy import signal
-#from matplotlib import gridspec
-#import sklearn
+from matplotlib import gridspec
+import sklearn
+
 #import tigramite
+from tigramite import data_processing as pp
+from tigramite import plotting as tp
+from tigramite.pcmci import PCMCI
+from tigramite.models import LinearMediation, Prediction
+from tigramite.independence_tests import ParCorr, GPDC, CMIknn, CMIsymb
+
+# import Marlene's RGCPD functions
+import RGCPD_functions_version_03 as rgcpd
+import statsmodels.api as sm
+from sklearn import preprocessing
+import statsmodels.api as sm
+
 
 import subprocess
 import functions_tig 
@@ -39,70 +49,82 @@ subprocess.call(runfile)
 #%%
 exp_clus = '13Jul-24Aug_ward'
 path_exp_clus = os.path.join('/Users/semvijverberg/surfdrive/Data_ERAint/t2m_sst_m5-8_dt14/', exp_clus)
-fig_path = os.path.join(path_exp_clus, 'output_tigr_SST_T2m/')
+fig_path = os.path.join(path_exp_clus, 'output_tigr_SST_T2m')
 if os.path.isdir(fig_path):
     pass
 else:
     os.makedirs(fig_path)
 exp = np.load(os.path.join(path_exp_clus, 'raw_input_tig_dic.npy')).item()
-# =============================================================================
-# # Expand dictionary for experiment
-# =============================================================================
 RV = exp['t2m']
+#%%
+file_type1 = ".pdf"
+file_type2 = ".png"
+SaveTF = False
+plot_all = True
+
+# =====================================================================================
+# 0) Parameters which must be specified
+#=====================================================================================
 file_path = os.path.join(RV.path_pp, RV.filename_pp)
 ncdf = Dataset(file_path)
 numtime = ncdf.variables['time']
 dates = pd.to_datetime(num2date(numtime[:], units=numtime.units, calendar=numtime.calendar))
 print("\nCheck if dates are correct, should be all same day acros years")
 dates[::dates[dates.year == 1979].size]
+#%% Expand dictionary for experiment
 exp['clus_anom_std'] = 1
 exp['alpha'] = 0.01 # significnace level for correlation maps
 exp['alpha_fdr'] = 2*exp['alpha'] # conservative significance level
-exp['lag_min'] = 3
-exp['lag_max'] = 3#dates[dates.year == 1979].size - exp['RV_oneyr'].size
-exp['alpha_level_tig'] = 0.05 # meaning of this one?
+exp['lag_min'] = 1
+exp['lag_max'] = dates[dates.year == 1979].size - exp['RV_oneyr'].size
+exp['alpha_level_vec'] = [0.1, 0.3, 0.9, 0.9] # meaning of this one?
 exp['FDR_control'] = False
 exp['la_min'] = -89 # select domain
 exp['la_max'] = 89
 exp['lo_min'] = -180
 exp['lo_max'] = 360
-exp['time_cycle'] = dates[dates.year == 1979].size # time-cycle of data. total timesteps in one year
-exp['pcA_range'] = [1,] 
 
-# sets of pc_alpha values
-pcA_set1a = [ 0.05] # 0.05 0.01 
-pcA_set1b = [ 0.01] # 0.05 0.01 
-pcA_set1c = [ 0.1] # 0.05 0.01 
-pcA_set2 = [ 0.2, 0.1, 0.05, 0.01, 0.001] # set2
-pcA_set3 = [ 0.1, 0.05, 0.01] # set3
-pcA_set4 = [ 0.5, 0.4, 0.3, 0.2, 0.1] # set4
-pcA_none = None # default
+lag_max = 3 # should be <time_cycle, what happens when predictant = 6th timestep, but timecycle = 8?
 
-
-#%%
-file_type1 = ".pdf"
-file_type2 = ".png"
-SaveTF = True
-plot_all = True
 #=====================================================================================
 # Calculates the indices which are taken for response-variable
 #=====================================================================================
 n_years = dates.year.max() - dates.year.min() 
 timeperiod = '{}-{}'.format(RV.startyear, RV.endyear)
+# time-cycle of data. total timesteps in one year
+## 365 for daily etc...
+time_cycle = dates[dates.year == 1979].size
+#
+## if complete time-series should be considered, n_steps = time-cycle
+## if only specific time-steps are considered (e.g. DJF then n-step = 3), n_steps says how many:
+#n_steps = dates[dates.year == 1979].size # days of the summer season 
+#
+## Start month is index of first relevant time-step
+## start_day = time-cycle, if alls values of the years should be considered
+#start_day = 20 # (= 10ther entry in array), pythonic counting
+#
+#seas_indices = range(n_steps)
+#
+#lag_steps = lag_max - lag_min +1
+
 time_range_all = [0, RV.dates_np.size]
 RV_indices = exp['RV_period']
-params_combination = 'lag{}to{}_aCorr{}'.format(exp['lag_min'],
-                         exp['lag_max'], exp['alpha'])
+
+
+params_combination = '_alphaCorr{}'.format(exp['alpha'])
 
 #%%
 #==================================================================================
 # 1) Define index of interest (here: Polar vortex index based on gph)
 #==================================================================================
+
+#===================================================================
 # Important: 
 # index is defined over all time-steps. 
 # Later in step 2 only the specific steps will be extracted
 #====================================================================
 # load preprocessed predictant 
+# need xarray funtionality for a second
 RV_array = np.squeeze(functions_tig.import_array(RV))
 RV_array, region_coords = functions_tig.find_region(RV_array, region='U.S.')
 RV_array.shape
@@ -113,12 +135,10 @@ time , nlats, nlons = RV_array.shape # [months , lat, lon]
 cluster = 0
 clusters = np.squeeze(xr.Dataset.from_dict(np.load(os.path.join(exp['path_exp_clus'], 'clusters_dic.npy')).item()).to_array())
 cluster_out = clusters.sel(cluster=cluster)
-RV_masked = np.ma.masked_where((cluster_out < exp['clus_anom_std']*cluster_out.std()), cluster_out).mask
+RV_masked = np.ma.masked_where(cluster_out < exp['clus_anom_std']*cluster_out.std(), cluster_out)
 functions_tig.xarray_plot(cluster_out)
 plt.imshow(RV_masked)
-# fix this
-RV_region = np.ma.masked_array(data=RV_array, mask=np.reshape(np.repeat(RV_masked, RV_array.time.size), RV_array.shape))
-RV1D = np.ma.mean(RV_region, axis = (1,2))
+RV1D = np.ma.mean(RV_masked, axis = (0,1))
 #=====================================================================================
 # 2) extract specific months of MT index 
 #=====================================================================================
@@ -127,6 +147,7 @@ RV_index = RV1D[RV_indices]
 
 #%%
 
+
 # 3) DEFINE PRECURSOS COMMUNITIES:
 # - calculate and plot pattern correltion for differnt fields
 # - create time-series over these regions 
@@ -134,13 +155,13 @@ RV_index = RV1D[RV_indices]
 #=====================================================================================
 outd = dict()
 class act:
-    def __init__(self, name, Corr, lat_grid, lon_grid, actbox, tsCorr, n_reg_perlag, fig):
+    def __init__(self, name, Corr, lat_grid, lon_grid, actbox, OutCorr, n_reg_perlag, fig):
         self.name = var
         self.Corr = Corr
         self.lat_grid = lat_grid
         self.lon_grid = lon_grid
         self.actbox = actbox
-        self.tsCorr = tsCorr
+        self.OutCorr = OutCorr
         self.n_reg_perlag = n_reg_perlag
         self.fig = fig
 
@@ -164,24 +185,35 @@ for var in allvar:
     # Calculate correlation 
     # =============================================================================
     Corr, lat_grid, lon_grid = rgcpd.calc_corr_coeffs_new(ncdf, array, box, RV_index, time_range_all, exp['lag_min'], 
-                                                          exp['lag_max'], exp['time_cycle'], RV_indices, 
+                                                          exp['lag_max'], time_cycle, RV_indices, 
                                                           exp['alpha_fdr'], FDR_control=exp['FDR_control'])
     # =============================================================================
     # Plot    
     # =============================================================================
     fig_corr_act1 = rgcpd.plot_corr_coeffs(Corr, m, exp['lag_min'], lat_grid, lon_grid,\
                                             title=var, Corr_mask=False)
-    fig_filename = '{}_vs_{}_{}'.format(allvar[0], var, params_combination) + file_type2
+    fig_filename = '{}_vs_{}_lag_{}to{}'.format(allvar[0], var, exp['lag_min'], exp['lag_max']) + params_combination + file_type2
     plt.savefig(os.path.join(fig_path, fig_filename), dpi=250)  
     # =============================================================================
     # what happens here?    
     # =============================================================================
     actbox = rgcpd.extract_data(ncdf, array, time_range_all, box)
     actbox = np.reshape(actbox, (actbox.shape[0], -1))
-    tsCorr, n_reg_perlag, fig = rgcpd.calc_actor_ts_and_plot(Corr, actbox, 
-                            exp['lag_min'], lat_grid, lon_grid, m, var+' actors')
-    outd[var] = act(var, Corr, lat_grid, lon_grid, actbox, tsCorr, n_reg_perlag, fig)
+    OutCorr, n_reg_perlag, fig = rgcpd.calc_actor_ts_and_plot(actor.Corr, actor.actbox, 
+                            exp['lag_min'], actor.lat_grid, actor.lon_grid, m, actor.name+' actors')
+    outd[var] = act(var, Corr, lat_grid, lon_grid, actbox, OutCorr, n_reg_perlag, fig)
 
+#%%
+
+#V200_box = rgcpd.extract_data(v200, V200, time_range_all, box)
+## reshape
+#V200_box = np.reshape(V200_box, (V200_box.shape[0], -1))
+
+#m = Basemap(llcrnrlon=0,llcrnrlat=-20,urcrnrlon=360,urcrnrlat=85,projection='mill')
+#actor = outd[allvar[1]] ; 
+
+#outd[allvar[1]] = actor # update class instance in dictionary
+#Actors_V200, n_reg_perlag_V200, fig_V200 = rgcpd.calc_actor_ts_and_plot(Corr_V200, V200_box, lag_min, lat_grid_v200, lon_grid_v200, m, 'V200 actors')
 #%%
 #=====================================================================================
 #
@@ -191,11 +223,18 @@ for var in allvar:
 # ======================================================================================================================
 # Choose
 # ======================================================================================================================
-# alpha level for multiple linear regression model (last step)
-alpha_level = exp['alpha_level_tig']
+alpha_level = alpha_level_vec[l]  
 
-# p lets you choose the pcA alpha values
-for p in exp['pcA_range']:#range(7):
+# set of pc_alpha values
+pcA_none = None# default
+pcA_set1a = [ 0.05] # 0.05 0.01 
+pcA_set1b = [ 0.01] # 0.05 0.01 
+pcA_set1c = [ 0.1] # 0.05 0.01 
+pcA_set2 = [ 0.2, 0.1, 0.05, 0.01, 0.001] # set2
+pcA_set3 = [ 0.1, 0.05, 0.01] # set3
+pcA_set4 = [ 0.5, 0.4, 0.3, 0.2, 0.1] # set4
+
+for p in [0,]:#range(7):
         
     print( ' run tigramite 3, run.pcmci')
     print(p)
@@ -210,30 +249,36 @@ for p in exp['pcA_range']:#range(7):
     # check with  different lags
     # used combinations of parameters: 3-4, 3-5
     tau_min = exp['lag_min']
-    tau_max = exp['lag_max'] 
+    tau_max = exp['lag_min'] 
     
-    actorlist = []
     for var in allvar[1:]:
         print var
         actor = outd[var]
-        actorlist.append(actor.tsCorr)
-        
+        Act_array = actor.OutCorr
+        # stack actor time-series together:
+        # if more then one actor, then concatenate them into fulldata
+        fulldata = Act_array#np.concatenate((Act_v200), axis = 1)
+    
+        # add index of interest as first entry (here PCH):
+        fulldata = np.column_stack((RV_index, fulldata))
+        # save fulldata
+        file_name = ''.join([ params_combination, '_fulldata'])#,'.pdf' ])
+        fulldata.dump(''.join([fig_path, file_name]))  
+    
         # create array which contains number of region and variable name for each entry in fulldata:
         idx = allvar.index(var) - 1
-        actor.var_info = [[i+1, var, idx] for i in range(actor.tsCorr.shape[1])]
-    # stack actor time-series together:
-    fulldata = np.concatenate(tuple(actorlist), axis = 1)
-    # add index of interest as first entry (here PCH):
-    fulldata = np.column_stack((RV1D, fulldata))
-    # save fulldata
-    file_name = 'fulldata_{}'.format(params_combination)#,'.pdf' ])
-    fulldata.dump(os.path.join(fig_path, file_name+'.pkl'))
+        var_V200 = [[i+1, 'V200', idx] for i in range(Act_v200.shape[1])]
+        #var_SLP = [[i+1, 'SLP', 1] for i in range(Act_slp.shape[1])]
     
     # first entry is index of interest
-    var_names = [[0, allvar[0]]] + actor.var_info 
-    file_name = 'list_actors_{}'.format(params_combination)
+    var_names = [[0, 'MT']] + var_V200 
+        
+    
+    file_name = ''.join(['_maps.lag', params_combination, '_var_name'])#,'.pdf' ])
     var_names_np = np.asanyarray(var_names)
-    var_names_np.dump(os.path.join(fig_path, file_name+'.pkl'))  
+    var_names_np.dump(''.join([fig_path, file_name]))  
+       
+      
     ## ======================================================================================================================
     
     # ======================================================================================================================
@@ -246,13 +291,11 @@ for p in exp['pcA_range']:#range(7):
     # ======================================================================================================================
     print(data.shape)
     
-    # RV mask False for period that I want to analyse
-    idx_start_RVperiod = int(np.where(dates[dates.year == 1980] == exp['RV_oneyr'][0])[0])
     data_mask = np.ones(data.shape, dtype='bool') # true for actor months, false for RV months
-    for i in range(exp['RV_oneyr'].size): # total timesteps RV period, 12 is 
-        data_mask[idx_start_RVperiod+i:: exp['time_cycle'],:] = False # [22+i:: 52,:]
+    for i in range(4): # take into account 4 months starting from june=5
+        data_mask[5+i:: 12,:] = False # [22+i:: 52,:]
 #    for i in range(n_steps): # take into account 4 months starting from june=5
-#        data_mask[start_day+i:: exp['time_cycle'],:] = False # [22+i:: 52,:]
+#        data_mask[start_day+i:: time_cycle,:] = False # [22+i:: 52,:]
     ##
     T, N = data.shape
     
@@ -343,27 +386,27 @@ for p in exp['pcA_range']:#range(7):
     
     # parents of index of interest:
     # parents_neighbors = all_parents, estimates, iterations 		
-    parents_RV = all_parents[0]
+    parents_MT = all_parents[0]
     
      #==========================================================================
     # multiple testing problem:
     #==========================================================================
-    precursor_fields = exp['vars'][0][1:]
-    Corr_precursor_ALL = actorlist
+    precursor_fields = [ 'V200']
+    Corr_precursor_ALL = [ Corr_V200 ]
     
-    n_parents = len(parents_RV)
+    n_parents = len(parents_MT)
     a_plot = alpha_level
     
     #indices_parents_PoV = [pvalues_PoV.index(i) for i in parents_PoV]
     for i in range(n_parents):
-        link_number = parents_RV[i][0]
-        lag = np.abs(parents_RV[i][1])-1
-        index_in_fulldata = parents_RV[i][0]
+        link_number = parents_MT[i][0]
+        lag = np.abs(parents_MT[i][1])-1
+        index_in_fulldata = parents_MT[i][0]
         if index_in_fulldata>0:
        
             according_varname = var_names[index_in_fulldata][1]
             according_number = var_names[index_in_fulldata][0]
-            according_field_number = var_names[index_in_fulldata][2] # what is this, there is no third index
+            acording_field_number = var_names[index_in_fulldata][2]
             print("index_in_fulldata")
             print(index_in_fulldata)
             print("according_varname")
@@ -371,18 +414,17 @@ for p in exp['pcA_range']:#range(7):
             print("according_number")
             print(according_number)
             print("acording_field_number")
-            print(according_field_number)
+            print(acording_field_number)
             # *********************************************************
             # print and save only sign regions
             # *********************************************************
             according_fullname = str(according_number) + according_varname   
-            Corr_precursor = Corr_precursor_ALL[according_field_number]
+            Corr_precursor = Corr_precursor_ALL[acording_field_number]
            
-            rgcpd.print_particular_region(according_number, Corr_precursor[:, :], actor.lat_grid, actor.lon_grid, m, according_fullname)
-            fig_file = '{}par)_{}_{}_pcA{}_sign{}_{}{}'.format(i,according_fullname,
-                        params_combination,pc_alpha_name,a_plot,str(parents_RV[i][1]),file_type1)
-#                                    'pcA',pc_alpha_name,'_SIGN',str(a_plot),'_lag',str( parents_RV[i][1]), file_type1])#,'.pdf' ])
-            plt.savefig(os.path.join(fig_path, fig_file))   
+            rgcpd.print_particular_region(according_number, Corr_precursor[:, :], lat_grid_v200, lon_grid_v200, m, according_fullname)
+            fig_file = ''.join([str(i),'_par',according_fullname,'_lag', params_combination,'_tau',str(tau_min),'-',str(tau_max),
+                                    'pc_A',pc_alpha_name,'_SIGN',str(a_plot),'_lag',str( parents_MT[i][1]), file_type1])#,'.pdf' ])
+            plt.savefig(''.join([fig_path, fig_file]))   
                
             print('                                        ')
             # *********************************************************                                
@@ -391,7 +433,7 @@ for p in exp['pcA_range']:#range(7):
             according_fullname = str(according_number) + according_varname
             name = ''.join([str(index_in_fulldata),'_',according_fullname])
             #fulldata[:,index_in_fulldata].dump(''.join(['/home/dicapua/GOTHAM/Data/output/RGCPD/monthly/precurs_',name,'_2Act.monthly.lag', params_combination,
-            #'_t_min_',str(tau_min),'_t_max_', str(tau_max),'pc_alpha',str(pc_alpha),'.lag',str( parents_RV[i][1]), 'sign_lev',str(round(adjusted_pvalues[link_number, lag],4)) ]))
+            #'_t_min_',str(tau_min),'_t_max_', str(tau_max),'pc_alpha',str(pc_alpha),'.lag',str( parents_MT[i][1]), 'sign_lev',str(round(adjusted_pvalues[link_number, lag],4)) ]))
             print(fulldata[:,index_in_fulldata].size)
             print(name)
         else :
@@ -406,13 +448,13 @@ for p in exp['pcA_range']:#range(7):
         fig = plt.subplots(figsize=(6, 4))
          	
         for i in range(n_parents):
-            link_number = parents_RV[i][0]
-            lag = np.abs(parents_RV[i][1])-1
+            link_number = parents_MT[i][0]
+            lag = np.abs(parents_MT[i][1])-1
             #==========================================================================
             # save precursos indices form fulldata, to be stored and used to find the 
             # precursors of the precursors
             #==========================================================================
-            index_in_fulldata = parents_RV[i][0]
+            index_in_fulldata = parents_MT[i][0]
             if index_in_fulldata>0:
                
                 according_varname = var_names[index_in_fulldata][1]
@@ -429,8 +471,8 @@ for p in exp['pcA_range']:#range(7):
                 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
                 number_region = according_number
                 Corr_GPH = Corr_precursor[:, :]
-                lat_grid_gph= actor.lat_grid
-                lon_grid_gph = actor.lon_grid
+                lat_grid_gph= lat_grid_v200
+                lon_grid_gph = lon_grid_v200
                 
                 title  = according_fullname
                 # preparations
@@ -503,9 +545,9 @@ for p in exp['pcA_range']:#range(7):
     m.drawcoastlines(color='gray', linewidth=0.35)
     m.drawmapboundary(fill_color='white', color='gray')
     
-    plt.title('{}-{} {} tfreq{}days'.format(RV.name, RV.dataset, timeperiod, exp['tfreq']))
-    plt.savefig('{}_pcA{}_SIGN{}_all{}'.format(params_combination, pc_alpha_name, a_plot, file_type1),dpi=250)
-    plt.savefig('{}_pcA{}_SIGN{}_all{}'.format(params_combination, pc_alpha_name, a_plot, file_type2))
+    plt.title(''.join(['CPCrain-ERA-I MT ',timeperiod]))
+    plt.savefig(''.join([fig_path, 'lag', params_combination,'pc_A',pc_alpha_name,'_SIGN',str(a_plot),'all', file_type1]))
+    plt.savefig(''.join([fig_path, 'lag', params_combination,'pc_A',pc_alpha_name,'_SIGN',str(a_plot),'all', file_type2]))
     
     # *****************************************************************************
     # save output if SaveTF == True
@@ -520,7 +562,7 @@ for p in exp['pcA_range']:#range(7):
         in_file.close()    
         cont_split = contents.splitlines()
         # save a new file    
-        in_file=open(''.join([fig_path, params_combination,'pcA',pc_alpha_name,'_SIGN',str(a_plot),'.txt']),"wb")
+        in_file=open(''.join([fig_path,'lag', params_combination,'pc_A',pc_alpha_name,'_SIGN',str(a_plot),'.txt']),"wb")
         for i in range(0,len(cont_split)):
             in_file.write(cont_split[i]+'\r\n')
         in_file.close()
