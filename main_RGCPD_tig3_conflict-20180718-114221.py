@@ -42,6 +42,10 @@ def seefunction(func):
 #%%
 exp_clus = '13Jul-24Aug_ward'
 path_exp_clus = os.path.join('/Users/semvijverberg/surfdrive/Data_ERAint/t2m_sst_m5-8_dt14/', exp_clus)
+if os.path.isdir(fig_path):
+    pass
+else:
+    os.makedirs(fig_path)
 exp = np.load(os.path.join(path_exp_clus, 'raw_input_tig_dic.npy')).item()
 # =============================================================================
 # # Expand dictionary for experiment
@@ -65,28 +69,19 @@ exp['la_max'] = 89
 exp['lo_min'] = -180
 exp['lo_max'] = 360
 exp['time_cycle'] = dates[dates.year == 1979].size # time-cycle of data. total timesteps in one year
-# dict of sets of pc_alpha values
-pcA_sets = dict({
-      'pcA_set1a' : [ 0.05], # 0.05 0.01 
-      'pcA_set1b' : [ 0.01], # 0.05 0.01 
-      'pcA_set1c' : [ 0.1], # 0.05 0.01 
-      'pcA_set2'  : [ 0.2, 0.1, 0.05, 0.01, 0.001], # set2
-      'pcA_set3'  : [ 0.1, 0.05, 0.01], # set3
-      'pcA_set4'  : [ 0.5, 0.4, 0.3, 0.2, 0.1], # set4
-      'pcA_none'  : None # default
-      })
-exp['pcA_set'] = ['pcA_set1a'] 
-params_combination = 'lag{}to{}_aCorr{}'.format(exp['lag_min'],
-                         exp['lag_max'], exp['alpha'])
-exp['path_output'] = os.path.join(exp['path_exp_clus'], 'output_tigr_SST_T2m/')
-fig_path = os.path.join(exp['path_output'], 'lag{}to{}/'.format(exp['lag_min'],exp['lag_max']))
-fig_subpath_form = os.path.join(fig_path, '{}_pcA_SIGN{}_subinfo/'.format(params_combination, 
-                           exp['alpha_level_tig']))
-                           
-if os.path.isdir(fig_path):
-    pass
-else:
-    os.makedirs(fig_path)
+exp['pcA_range'] = [0,] 
+exp['path_lags'] = os.path.join(exp['path_exp_clus'], 'lag{}to{}'.format(exp['lag_min'],exp['lag_max']))
+fig_path = os.path.join(exp['path_lags'], 'output_tigr_SST_T2m/')
+# sets of pc_alpha values
+pcA_set1a = [ 0.05] # 0.05 0.01 
+pcA_set1b = [ 0.01] # 0.05 0.01 
+pcA_set1c = [ 0.1] # 0.05 0.01 
+pcA_set2 = [ 0.2, 0.1, 0.05, 0.01, 0.001] # set2
+pcA_set3 = [ 0.1, 0.05, 0.01] # set3
+pcA_set4 = [ 0.5, 0.4, 0.3, 0.2, 0.1] # set4
+pcA_none = None # default
+
+
 #%%
 file_type1 = ".pdf"
 file_type2 = ".png"
@@ -99,6 +94,8 @@ n_years = dates.year.max() - dates.year.min()
 timeperiod = '{}-{}'.format(RV.startyear, RV.endyear)
 time_range_all = [0, RV.dates_np.size]
 RV_indices = exp['RV_period']
+params_combination = 'lag{}to{}_aCorr{}'.format(exp['lag_min'],
+                         exp['lag_max'], exp['alpha'])
 
 #%%
 #==================================================================================
@@ -201,25 +198,16 @@ for var in allvar:
 alpha_level = exp['alpha_level_tig']
 
 # p lets you choose the pcA alpha values
-for pc_alpha_name in exp['pcA_set']:#range(7):
+for p in exp['pcA_range']:#range(7):
         
     print( ' run tigramite 3, run.pcmci')
-    print(pc_alpha_name)
+    print(p)
     '''
     save output
     '''
-    pc_alpha = pcA_sets[pc_alpha_name]   
-    insertpca = fig_subpath_form.split('pcA')
-    fig_subpath = insertpca[0] + '{}'.format(pc_alpha_name) + insertpca[1]
-    if os.path.isdir(fig_subpath):
-        pass
-    else:
-        os.makedirs(fig_subpath)
-#    pcA_sets[exp['pcA_set']]    
-
     if SaveTF == True:
         orig_stdout = sys.stdout
-        sys.stdout = f = open(''.join([fig_subpath,'old.txt']), 'a')
+        sys.stdout = f = open(''.join([fig_path,'old.txt']), 'a')
     
     #for only_one_lag in [0, ]:#range(lag_max):
     # check with  different lags
@@ -242,13 +230,13 @@ for pc_alpha_name in exp['pcA_set']:#range(7):
     fulldata = np.column_stack((RV1D, fulldata))
     # save fulldata
     file_name = 'fulldata_{}'.format(params_combination)#,'.pdf' ])
-    fulldata.dump(os.path.join(fig_subpath, file_name+'.pkl'))
+    fulldata.dump(os.path.join(fig_path, file_name+'.pkl'))
     
     # first entry is index of interest
     var_names = [[0, allvar[0]]] + actor.var_info 
     file_name = 'list_actors_{}'.format(params_combination)
     var_names_np = np.asanyarray(var_names)
-    var_names_np.dump(os.path.join(fig_subpath, file_name+'.pkl'))  
+    var_names_np.dump(os.path.join(fig_path, file_name+'.pkl'))  
     ## ======================================================================================================================
     
     # ======================================================================================================================
@@ -294,7 +282,33 @@ for pc_alpha_name in exp['pcA_set']:#range(7):
         var_names=var_names,
         selected_variables=None, # consider precursor only of RV variable, then selected_variables should be None
         verbosity=2)
-         
+        
+    # ======================================================================================================================
+    # results = pcmci.run_pcmci(tau_max=tau_max, pc_alpha = pc_alpha, tau_min = tau_min, max_combinations=1  )
+    # ======================================================================================================================
+    
+    if p == 0:
+        pc_alpha = pcA_set1a 
+        pc_alpha_name = str(pcA_set1a)
+    elif p == 1:
+        pc_alpha = pcA_set1b
+        pc_alpha_name = str(pcA_set1b)
+    elif p == 2:
+        pc_alpha = pcA_set1c
+        pc_alpha_name = str(pcA_set1c)
+    elif p == 3:
+        pc_alpha = pcA_set2
+        pc_alpha_name = 'set2'
+    elif p == 4:
+        pc_alpha = pcA_set3
+        pc_alpha_name = 'set3'
+    elif p == 5:
+        pc_alpha = pcA_set4
+        pc_alpha_name = 'set4'
+    elif p == 6:
+        pc_alpha = pcA_none
+        pc_alpha_name = 'none'
+        
     # ======================================================================================================================
     results = pcmci.run_pcmci(tau_max=tau_max, pc_alpha = pc_alpha, tau_min = tau_min, max_combinations=1  ) #selected_links = dictionary/None
     #results = pcmci.run_pcmci(selected_links =None, tau_max=tau_max, pc_alpha = pc_alpha, tau_min = tau_min,save_iterations=False,  max_conds_dim=None, max_combinations=1, max_conds_py=None, max_conds_px=None) #selected_links = dictionary/None
@@ -338,13 +352,12 @@ for pc_alpha_name in exp['pcA_set']:#range(7):
     # multiple testing problem:
     #==========================================================================
     precursor_fields = exp['vars'][0][1:]
-    Corr_mask_list = []
-    for var in allvar[1:]:
-        actor = outd[var]
-        Corr_mask_list.append(actor.Corr_mask)
-    Corr_precursor_ALL = Corr_mask_list
+    Corr_precursor_ALL = [actor.Corr_mask]
     
-    n_parents = len(parents_RV)   
+    n_parents = len(parents_RV)
+    a_plot = alpha_level
+    
+    #indices_parents_PoV = [pvalues_PoV.index(i) for i in parents_PoV]
     for i in range(n_parents):
         link_number = parents_RV[i][0]
         lag = np.abs(parents_RV[i][1])-1
@@ -369,10 +382,10 @@ for pc_alpha_name in exp['pcA_set']:#range(7):
             Corr_precursor = Corr_precursor_ALL[according_field_number]
            
             rgcpd.print_particular_region(according_number, Corr_precursor[:, :], actor.lat_grid, actor.lon_grid, m, according_fullname)
-            fig_file = '{}_{}_{}_sign{}_{}{}'.format(according_fullname,
-                        params_combination,pc_alpha_name,alpha_level,str(parents_RV[i][1]),file_type2)
-            plt.savefig(os.path.join(fig_subpath, fig_file), dpi=250)   
-            plt.close()
+            fig_file = '{}par)_{}_{}_pcA{}_sign{}_{}{}'.format(i,according_fullname,
+                        params_combination,pc_alpha_name,a_plot,str(parents_RV[i][1]),file_type1)
+#                                    'pcA',pc_alpha_name,'_SIGN',str(a_plot),'_lag',str( parents_RV[i][1]), file_type1])#,'.pdf' ])
+            plt.savefig(os.path.join(fig_path, fig_file))   
                
             print('                                        ')
             # *********************************************************                                
@@ -387,151 +400,114 @@ for pc_alpha_name in exp['pcA_set']:#range(7):
         else :
             print 'Index itself is also causal parent -> skipped' 
             print('*******************              ***************************                ******************')
-
-# =============================================================================
-#   Plotting all fields significant at alpha_level_tig
-# =============================================================================
-    # stack all variables and lags togther to plot them in same basemap
-    Corr_Coeff_all_r_l = np.ma.concatenate(Corr_precursor_ALL[:],axis=1)
-    all_regions = np.ma.masked_all(Corr_Coeff_all_r_l[:,0].shape)
-    all_regions_tig = np.ma.masked_all(Corr_Coeff_all_r_l[:,0].shape)
-    for i in range(Corr_Coeff_all_r_l.shape[1]):
-        regions_i = rgcpd.define_regions_and_rank_new(Corr_Coeff_all_r_l[:,i], actor.lat_grid, actor.lon_grid)
-        regions_i = np.nan_to_num(regions_i)
-
-        all_regnumbers_tig = [reg[0] for reg in parents_RV]
-        indices_regs = np.where(regions_i >1)[0]
-        for i in indices_regs:
-            all_regions[i] = regions_i[i]
-            if regions_i[i] in all_regnumbers_tig:
-                all_regions_tig[i] = regions_i[i]
-    all_regions = all_regions.reshape((actor.lat_grid.size, actor.lon_grid.size))
-    all_regions_tig = all_regions_tig.reshape((actor.lat_grid.size, actor.lon_grid.size))
-
     
-    m.drawcoastlines(color='gray', linewidth=0.35)
-    m.drawmapboundary(fill_color='white', color='white')
-    lon_mesh, lat_mesh = np.meshgrid(lon_grid, lat_grid)
-    m.contourf(lon_mesh,lat_mesh, all_regions_tig, latlon = True)
-    plt.title('{}-{} {} tfreq{}days'.format(RV.name, RV.dataset, timeperiod, exp['tfreq']))
-    file_name = '{}_{}_SIGN{}_all'.format(params_combination, pc_alpha_name, alpha_level)
-    plt.savefig(os.path.join(fig_subpath, file_name + file_type1))
-    plt.savefig(os.path.join(fig_path, file_name + file_type2),dpi=250)  
-# =============================================================================
-#                 
-# =============================================================================
-#    if plot_all == True:
-##        m = Basemap(projection='hammer',lon_0 = 0 ,resolution='c')     #300       
-#        #plt.plot()
-#        count = 0
-#        #fig = plt.figure(figsize=(6, 4))
-#        fig = plt.subplots(figsize=(6, 4))
-#         	
-#        for i in range(n_parents):
-#            link_number = parents_RV[i][0]
-#            lag = np.abs(parents_RV[i][1])-1
-#            #==========================================================================
-#            # save precursos indices form fulldata, to be stored and used to find the 
-#            # precursors of the precursors
-#            #==========================================================================
-#            index_in_fulldata = parents_RV[i][0]
-#            if index_in_fulldata>0:
-#               
-#                according_varname = var_names[index_in_fulldata][1]
-#                according_number = var_names[index_in_fulldata][0]
-#                according_field_number = var_names[index_in_fulldata][2]
-#                # *********************************************************
-#                # print and save only sign regions
-#                # *********************************************************
-#                according_fullname = str(according_number) + according_varname   
-#                Corr_precursor = Corr_precursor_ALL[according_field_number]
-#               
-#                #oad.print_particular_region(according_number, Corr_precursor[:, tau_min - 1:], lat_grid_v200, lon_grid_v200, m, according_fullname)
-#                #rgcpd.print_particular_region(according_number, Corr_precursor[:, :], lat_grid_v200, lon_grid_v200, m, according_fullname)
-#                # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-#                number_region = according_number
-#                Corr_Coeff = Corr_precursor[:, :]
-#                
-#                title  = according_fullname
-#                # preparations
-#                lag_steps = Corr_Coeff.shape[1]
-#                lat_len = actor.lat_grid.shape[0]
-#                lon_len = actor.lon_grid.shape[0]
-#                
-#                 	
-#                cmap_regions = matplotlib.colors.ListedColormap(sns.color_palette("Set2"))
-#                cmap_regions.set_bad('w')
-#                               
-##                x = 0
-##                vmax = 50
-##                for i in range(lag_steps):
-##                    Regions_lag_i = rgcpd.define_regions_and_rank_new(Corr_Coeff[:,i], actor.lat_grid, actor.lon_grid)
-##                    n_regions_lag_i = int(Regions_lag_i.max())
-##                		
-##                    x_reg = np.max(Regions_lag_i)	
-##                    levels = np.arange(x, x + x_reg +1)+.5
-#                    
-##                    A_r = A_r + x
-##                				
-##                    x = A_r.max() 
-##                		
-##                    print x
-##                    if x >= number_region:
-##                        A_number_region = np.zeros(A_r.shape)
-##                			
-##                        A_number_region[A_r == number_region]=1
-##                        A_number_region[A_r != number_region]=np.nan
-##                        #values[ values==0 ] = np.nan
-##                        print('count')
-##                        print(count)
-##                        if count == 0:
-##                            cs =  m.contourf(lon_mesh,lat_mesh, A_number_region, latlon = True, colors = ["deepskyblue", "black", "white"]) #SLP
-##                        elif count == 1:
-##                            cs1 =  m.contourf(lon_mesh,lat_mesh, A_number_region, latlon = True, colors = ["royalblue" , "black", "white"]) #V200Japan
-##                        elif count == 2:
-##                            cs2 =  m.contourf(lon_mesh,lat_mesh, A_number_region, latlon = True, colors = ["lightsalmon","black", "white"]) #V200Panama
-##                        elif count == 3:
-##                            cs3 =  m.contourf(lon_mesh,lat_mesh, A_number_region, latlon = True,colors = ["crimson", "black", "white"]) #V200Arctic
-##                        elif count == 4:
-##                            cs4 =  m.contourf(lon_mesh,lat_mesh, A_number_region, latlon = True,colors = ["sandybrown", "black", "white"])
-##                        elif count == 5:
-##                            cs5 =  m.contourf(lon_mesh,lat_mesh, A_number_region, latlon = True,colors = ["royalblue", "black", "white"])
-##                            
-##                        elif count == 6:
-##                            cs6 =  m.contourf(lon_mesh,lat_mesh, A_number_region, latlon = True,colors = ["khaki", "black", "white"])
-#                		
-#                		  #if colors should be different for each subplot:
-#                        #m.contourf(lon_mesh,lat_mesh, A_r, levels, latlon = True, cmap = cmap_regions, vmin = 1, cmax = vmax)
-#                        #m.colorbar(location="bottom")
-#                        
-##                        m.drawcoastlines(color='gray', linewidth=0.35)
-##                        m.drawmapboundary(fill_color='white', color='gray')
-##                    
-##                        plt.title('{}-{} {} tfreq{}days'.format(RV.name, RV.dataset, timeperiod, exp['tfreq']))
-##                        file_name = '{}_{}_SIGN{}_all'.format(params_combination, pc_alpha_name, alpha_level)
-##                        plt.savefig(os.path.join(fig_subpath, file_name + file_type1))
-##                        plt.savefig(os.path.join(fig_path, file_name + file_type2),dpi=250)
-#                # *********************************************************
-#                according_fullname = str(according_number) + according_varname
-#                name = ''.join([str(index_in_fulldata),'_',according_fullname])
-#                count = count +1
-#                print("count")
-#                print(count)
-#            else :
-#                print 'Index itself is also causal parent -> skipped' 
-#                print('*******************              ***************************                ******************')
-#        
-#        else:
-#            print("vars not sign at alpha = 0.05")
+    if plot_all == True:
+        m = Basemap(projection='hammer',lon_0 = 0 ,resolution='c')     #300       
+        #plt.plot()
+        count = 0
+        #fig = plt.figure(figsize=(6, 4))
+        fig = plt.subplots(figsize=(6, 4))
+         	
+        for i in range(n_parents):
+            link_number = parents_RV[i][0]
+            lag = np.abs(parents_RV[i][1])-1
+            #==========================================================================
+            # save precursos indices form fulldata, to be stored and used to find the 
+            # precursors of the precursors
+            #==========================================================================
+            index_in_fulldata = parents_RV[i][0]
+            if index_in_fulldata>0:
+               
+                according_varname = var_names[index_in_fulldata][1]
+                according_number = var_names[index_in_fulldata][0]
+                according_field_number = var_names[index_in_fulldata][2]
+                # *********************************************************
+                # print and save only sign regions
+                # *********************************************************
+                according_fullname = str(according_number) + according_varname   
+                Corr_precursor = Corr_precursor_ALL[according_field_number]
+               
+                #oad.print_particular_region(according_number, Corr_precursor[:, tau_min - 1:], lat_grid_v200, lon_grid_v200, m, according_fullname)
+                #rgcpd.print_particular_region(according_number, Corr_precursor[:, :], lat_grid_v200, lon_grid_v200, m, according_fullname)
+                # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+                number_region = according_number
+                Corr_Coeff = Corr_precursor[:, :]
+                
+                title  = according_fullname
+                # preparations
+                lag_steps = Corr_Coeff.shape[1]
+                lat_len = actor.lat_grid.shape[0]
+                lon_len = actor.lon_grid.shape[0]
+                lon_mesh, lat_mesh = np.meshgrid(lon_grid, lat_grid)
+                 	
+                cmap_regions = matplotlib.colors.ListedColormap(sns.color_palette("Set2"))
+                cmap_regions.set_bad('w')
+                
+                
+                x = 0
+                vmax = 50
+                for i in range(lag_steps):
+                    Regions_lag_i = rgcpd.define_regions_and_rank_new(Corr_Coeff[:,i], actor.lat_grid, actor.lon_grid)
+                    n_regions_lag_i = int(Regions_lag_i.max())
+                		
+                    x_reg = np.max(Regions_lag_i)	
+                    levels = np.arange(x, x + x_reg +1)+.5
+                
+                    A_r = np.reshape(Regions_lag_i, (lat_len, lon_len))
+                    A_r = A_r + x
+                				
+                    x = A_r.max() 
+                		
+                    print x
+                    if x >= number_region:
+                        A_number_region = np.zeros(A_r.shape)
+                			
+                        A_number_region[A_r == number_region]=1
+                        A_number_region[A_r != number_region]=np.nan
+                        #values[ values==0 ] = np.nan
+                        print('count')
+                        print(count)
+                        if count == 0:
+                            cs =  m.contourf(lon_mesh,lat_mesh, A_number_region, latlon = True, colors = ["deepskyblue", "black", "white"]) #SLP
+                        elif count == 1:
+                            cs1 =  m.contourf(lon_mesh,lat_mesh, A_number_region, latlon = True, colors = ["royalblue" , "black", "white"]) #V200Japan
+                        elif count == 2:
+                            cs2 =  m.contourf(lon_mesh,lat_mesh, A_number_region, latlon = True, colors = ["lightsalmon","black", "white"]) #V200Panama
+                        elif count == 3:
+                            cs3 =  m.contourf(lon_mesh,lat_mesh, A_number_region, latlon = True,colors = ["crimson", "black", "white"]) #V200Arctic
+                        elif count == 4:
+                            cs4 =  m.contourf(lon_mesh,lat_mesh, A_number_region, latlon = True,colors = ["sandybrown", "black", "white"])
+                        elif count == 5:
+                            cs5 =  m.contourf(lon_mesh,lat_mesh, A_number_region, latlon = True,colors = ["royalblue", "black", "white"])
+                            
+                        elif count == 6:
+                            cs6 =  m.contourf(lon_mesh,lat_mesh, A_number_region, latlon = True,colors = ["khaki", "black", "white"])
+                		
+                		  #if colors should be different for each subplot:
+                        #m.contourf(lon_mesh,lat_mesh, A_r, levels, latlon = True, cmap = cmap_regions, vmin = 1, cmax = vmax)
+                        #m.colorbar(location="bottom")
+                        break
+                # *********************************************************
+                according_fullname = str(according_number) + according_varname
+                name = ''.join([str(index_in_fulldata),'_',according_fullname])
+                count = count +1
+                print("count")
+                print(count)
+            else :
+                print 'Index itself is also causal parent -> skipped' 
+                print('*******************              ***************************                ******************')
+        
+        else:
+            print("vars not sign at alpha = 0.05")
             
     
-#    m.drawcoastlines(color='gray', linewidth=0.35)
-#    m.drawmapboundary(fill_color='white', color='gray')
-#
-#    plt.title('{}-{} {} tfreq{}days'.format(RV.name, RV.dataset, timeperiod, exp['tfreq']))
-#    file_name = '{}_{}_SIGN{}_all'.format(params_combination, pc_alpha_name, alpha_level)
-#    plt.savefig(os.path.join(fig_subpath, file_name + file_type1))
-#    plt.savefig(os.path.join(fig_path, file_name + file_type2),dpi=250)
+    m.drawcoastlines(color='gray', linewidth=0.35)
+    m.drawmapboundary(fill_color='white', color='gray')
+    
+    plt.title('{}-{} {} tfreq{}days'.format(RV.name, RV.dataset, timeperiod, exp['tfreq']))
+    file_name = '{}_pcA{}_SIGN{}_all{}'.format(params_combination, pc_alpha_name, a_plot)
+    plt.savefig(os.path.join(fig_path, file_name + file_type1),dpi=250)
+    plt.savefig(os.path.join(fig_path, file_name + file_type2))
     
     # *****************************************************************************
     # save output if SaveTF == True
@@ -541,17 +517,17 @@ for pc_alpha_name in exp['pcA_set']:#range(7):
         sys.stdout = orig_stdout
         f.close()    
         # reopen the file to reorder the lines
-        in_file=open(''.join([fig_subpath,'old.txt']),"rb")     
+        in_file=open(''.join([fig_path,'old.txt']),"rb")     
         contents = in_file.read()
         in_file.close()    
         cont_split = contents.splitlines()
         # save a new file    
-        in_file=open(''.join([fig_subpath, params_combination,'pcA',pc_alpha_name,'_SIGN',str(alpha_level),'.txt']),"wb")
+        in_file=open(''.join([fig_path, params_combination,'pcA',pc_alpha_name,'_SIGN',str(a_plot),'.txt']),"wb")
         for i in range(0,len(cont_split)):
             in_file.write(cont_split[i]+'\r\n')
         in_file.close()
         # delete old file
         import os
-        os.remove(''.join([fig_subpath,'old.txt']))  
+        os.remove(''.join([fig_path,'old.txt']))  
           
             

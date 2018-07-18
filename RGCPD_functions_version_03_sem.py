@@ -210,10 +210,10 @@ def calc_corr_coeffs_new(v, V, box, I, time_range_indices, lag_min, lag_max, tim
 
 def plot_corr_coeffs(Corr_Coeff, m, lag_min, lat_grid, lon_grid, title='Corr Maps for different time lags', Corr_mask=False):	
 	'''
-	This function plots the differnt corr coeffs on map m. the variable title must be a string. If mask==True, only significant values are shown.
-	'''
-	
-	print 'plotting correlation maps...'
+	This function plots the differnt corr coeffs on map m. the variable title must be a string. 
+     If mask==True, only significant values are shown.
+	'''	
+     print("plotting correlation maps... ")
 	n_rows = Corr_Coeff.shape[1]
 	fig = plt.figure(figsize=(4, 2*n_rows))
 	#fig.subplots_adjust(left=None, bottom = None, right=None, top=0.3, wspace=0.1, hspace= 0.1)
@@ -705,7 +705,7 @@ def print_particular_region(number_region, Corr_GPH, lat_grid_gph, lon_grid_gph,
 		
 		if (x >= number_region) & (x>0):
 					
-			A_number_region = numpy.zeros(A_r.shape)
+			A_number_region = np.zeros(A_r.shape)
 			A_number_region[A_r == number_region]=1
 			
 			plt.plot()
