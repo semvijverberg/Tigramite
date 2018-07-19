@@ -37,8 +37,8 @@ from inspect import getsourcelines
 def seefunction(func):
     print getsourcelines(func)
 #%% saving to github
-#runfile = os.path.join(script_dir, 'saving_repository_to_Github.sh')
-#subprocess.call(runfile)
+runfile = os.path.join(script_dir, 'saving_repository_to_Github.sh')
+subprocess.call(runfile)
 #%%
 exp_clus = '13Jul-24Aug_ward'
 path_exp_clus = os.path.join('/Users/semvijverberg/surfdrive/Data_ERAint/t2m_sst_m5-8_dt14/', exp_clus)
@@ -52,7 +52,7 @@ ncdf = Dataset(file_path)
 numtime = ncdf.variables['time']
 dates = pd.to_datetime(num2date(numtime[:], units=numtime.units, calendar=numtime.calendar))
 print("\nCheck if dates are correct, should be all same day acros years")
-dates[::dates[dates.year == 1979].size]
+print(dates[::dates[dates.year == 1979].size])
 exp['clus_anom_std'] = 1
 exp['alpha'] = 0.01 # significnace level for correlation maps
 exp['alpha_fdr'] = 2*exp['alpha'] # conservative significance level
@@ -140,9 +140,9 @@ RV_index = RV1D[RV_indices]
 #=====================================================================================
 outd = dict()
 class act:
-    def __init__(self, name, Corr_mask, lat_grid, lon_grid, actbox, tsCorr, n_reg_perlag, fig):
+    def __init__(self, name, Corr_Coeff, lat_grid, lon_grid, actbox, tsCorr, n_reg_perlag, fig):
         self.name = var
-        self.Corr_mask = Corr_mask
+        self.Corr_Coeff = Corr_Coeff
         self.lat_grid = lat_grid
         self.lon_grid = lon_grid
         self.actbox = actbox
@@ -169,24 +169,25 @@ for var in allvar:
     # =============================================================================
     # Calculate correlation 
     # =============================================================================
-    Corr_mask, lat_grid, lon_grid = rgcpd.calc_corr_coeffs_new(ncdf, array, box, RV_index, time_range_all, exp['lag_min'], 
+    Corr_Coeff, lat_grid, lon_grid = rgcpd.calc_corr_coeffs_new(ncdf, array, box, RV_index, time_range_all, exp['lag_min'], 
                                                           exp['lag_max'], exp['time_cycle'], RV_indices, 
                                                           exp['alpha_fdr'], FDR_control=exp['FDR_control'])
+    Corr_Coeff = np.ma.array(data = Corr_Coeff[:,:], mask = Corr_Coeff.mask[:,:])
     # =============================================================================
     # Plot    
     # =============================================================================
-    fig_corr_act1 = rgcpd.plot_corr_coeffs(Corr_mask, m, exp['lag_min'], lat_grid, lon_grid,\
-                                            title=var, Corr_mask=False)
-    fig_filename = '{}_vs_{}_{}'.format(allvar[0], var, params_combination) + file_type2
-    plt.savefig(os.path.join(fig_path, fig_filename), dpi=250)  
+#    fig_corr_act1 = rgcpd.plot_corr_coeffs(Corr_Coeff, m, exp['lag_min'], lat_grid, lon_grid,\
+#                                            title=var, Corr_mask=False)
+#    fig_filename = '{}_vs_{}_{}'.format(allvar[0], var, params_combination) + file_type2
+#    plt.savefig(os.path.join(fig_path, fig_filename), dpi=250)  
     # =============================================================================
     # what happens here?    
     # =============================================================================
     actbox = rgcpd.extract_data(ncdf, array, time_range_all, box)
     actbox = np.reshape(actbox, (actbox.shape[0], -1))
-    tsCorr, n_reg_perlag, fig = rgcpd.calc_actor_ts_and_plot(Corr_mask, actbox, 
+    tsCorr, n_reg_perlag, fig = rgcpd.calc_actor_ts_and_plot(Corr_Coeff, actbox, 
                             exp['lag_min'], lat_grid, lon_grid, m, var+' actors')
-    outd[var] = act(var, Corr_mask, lat_grid, lon_grid, actbox, tsCorr, n_reg_perlag, fig)
+    outd[var] = act(var, Corr_Coeff, lat_grid, lon_grid, actbox, tsCorr, n_reg_perlag, fig)
 
 #%%
 #=====================================================================================
@@ -296,7 +297,7 @@ for pc_alpha_name in exp['pcA_set']:#range(7):
         verbosity=2)
          
     # ======================================================================================================================
-    results = pcmci.run_pcmci(tau_max=tau_max, pc_alpha = pc_alpha, tau_min = tau_min, max_combinations=1  ) #selected_links = dictionary/None
+    results = pcmci.run_pcmci(tau_max=tau_max, pc_alpha = pc_alpha, tau_min = tau_min, max_combinations=1) #selected_links = dictionary/None
     #results = pcmci.run_pcmci(selected_links =None, tau_max=tau_max, pc_alpha = pc_alpha, tau_min = tau_min,save_iterations=False,  max_conds_dim=None, max_combinations=1, max_conds_py=None, max_conds_px=None) #selected_links = dictionary/None
     #results = pcmci.run_pcmci(selected_links =  dictionary, tau_max=tau_max, pc_alpha = pc_alpha, tau_min = tau_min,save_iterations=False,  max_conds_dim=None, max_combinations=1, max_conds_py=None, max_conds_px=None) #selected_links = dictionary/None
     
@@ -337,12 +338,13 @@ for pc_alpha_name in exp['pcA_set']:#range(7):
      #==========================================================================
     # multiple testing problem:
     #==========================================================================
+    # combine all variables in one list
     precursor_fields = exp['vars'][0][1:]
-    Corr_mask_list = []
+    Corr_Coeff_list = []
     for var in allvar[1:]:
         actor = outd[var]
-        Corr_mask_list.append(actor.Corr_mask)
-    Corr_precursor_ALL = Corr_mask_list
+        Corr_Coeff_list.append(actor.Corr_Coeff)
+    Corr_precursor_ALL = Corr_Coeff_list
     
     n_parents = len(parents_RV)   
     for i in range(n_parents):
@@ -367,7 +369,7 @@ for pc_alpha_name in exp['pcA_set']:#range(7):
             # *********************************************************
             according_fullname = str(according_number) + according_varname   
             Corr_precursor = Corr_precursor_ALL[according_field_number]
-           
+#            xr.DataArray(data=Corr_precursor, coords=[actor.lat_grid, actor.lon_grid], dims=('latitude','longitude'))
             rgcpd.print_particular_region(according_number, Corr_precursor[:, :], actor.lat_grid, actor.lon_grid, m, according_fullname)
             fig_file = '{}_{}_{}_sign{}_{}{}'.format(according_fullname,
                         params_combination,pc_alpha_name,alpha_level,str(parents_RV[i][1]),file_type2)

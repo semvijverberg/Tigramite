@@ -163,3 +163,119 @@ def save_figure(data, path):
         name = 'fig_' + today + '.jpeg'
     print('{} to path {}'.format(name, path))
     plt.savefig(os.path.join(path,name), format='jpeg', bbox_inches='tight')
+
+def xarray_plot_region(outd, lat, lon, map_proj):
+    #%%
+    import cartopy.crs as ccrs
+    import seaborn as sns
+    import numpy as np
+    import xarray as xr
+    map_proj = ccrs.LambertCylindrical(central_longitude=int(cluster_out.longitude.mean()))
+    map_proj = ccrs.Orthographic(central_longitude=int(cluster_out.longitude.mean()), central_latitude=0)
+    # testing with two sst field to plot variables in columns:
+    list_Corr = []
+    list_mask = []
+    for var in outd.keys():
+        lags = outd[var].Corr_Coeff.shape[1]
+        variables = outd.keys()
+        lat = outd[var].lat_grid
+        lon = outd[var].lon_grid
+        list_Corr.append(outd[var].Corr_Coeff.data[None,:,:].reshape(lat.size,lon.size,lags))
+        list_mask.append(outd[var].Corr_Coeff.mask[None,:,:].reshape(lat.size,lon.size,lags))
+    Corr_regvar = np.array(list_Corr)
+    mask_regvar = np.array(list_mask)
+    
+#        Corr_regvar.shape
+
+    xrdata = xr.DataArray(data=Corr_regvar, coords=[variables, lat, lon, range(lags)], 
+                        dims=['vars','latitude','longitude','lag'], name='Corr Coeff')
+    xrmask = xr.DataArray(data=mask_regvar, coords=[variables, lat, lon, range(lags)], 
+                        dims=['vars','latitude','longitude','lag'], name='Corr Coeff')
+#    Corr_regvar = np.ma.concatenate(list_Corr[:],axis=0)
+    g = xr.plot.FacetGrid(xrdata, row='lag', col='vars', subplot_kws={'projection': map_proj},
+                      aspect= (2*lon.size) / lat.size, size=2)
+    vmin = xrdata.min() ; vmax = xrdata.max()
+    for var in variables:
+        col = variables.index(var)
+        for lag in range(lags):
+            row = lag
+            print lag, col
+            plotdata = xrdata.isel(lag=col, vars=row)
+            plotmask = xrmask.isel(lag=col, vars=row)
+            if lag == lags-1:
+                cbar = True
+            else:
+                cbar = False
+            sax = plotmask.plot.contour(ax=g.axes[col,row], transform=ccrs.PlateCarree(),
+                                         subplot_kws={'projection': map_proj}, colors=['black'],
+                                         levels=[float(vmin),float(vmax)],add_colorbar=False)
+            sax = plotdata.plot.contourf(ax=g.axes[col,row], transform=ccrs.PlateCarree(),
+                                          subplot_kws={'projection': map_proj},add_colorbar=True)
+#            if lag == lags-1:
+#                print True
+#                plt.colorbar(sax)
+    for ax in g.axes.flat:
+                ax.coastlines()
+    
+                #%%
+#    for ax in g.axes.flat:
+#        row = ax.rowNum
+#        col = ax.colNum
+#        print col,row
+#        plotdata = xrdata.isel(lag=col, vars=row)
+#        sax = plotdata.plot.contour(ax=g.axes[col,row], transform=ccrs.PlateCarree(),
+#                                         subplot_kws={'projection': map_proj}, colors=['black'],
+#                                         levels=[float(vmin),float(vmax)],add_colorbar=False)
+#        sax = plotdata.plot.contourf(ax=g.axes[col,row], transform=ccrs.PlateCarree(),
+#                                          subplot_kws={'projection': map_proj},add_colorbar=False)
+##        g.add_colorbar(0)
+#        
+#        if ax.numRows-1 == row:
+#            print True
+#            plt.colorbar(sax)
+##            g.add_colorbar()
+##            ax.colorbar()
+#    for ax in g.axes.flat:
+#                ax.coastlines()
+#    #%%
+#    for var in outd.keys():
+#        lags = outd[var].Corr_Coeff.shape[1]
+#        lat = outd[var].lat_grid
+#        lon = outd[var].lon_grid
+#        Corr_lags = outd[var].Corr_Coeff.data.reshape(lat.size,lon.size,lags)
+##        Corr_lags = np.ma.array(data = Corr_Coeff[:,:], mask = Corr_Coeff.mask[:,:])
+#        sig_mask = outd[var].Corr_Coeff.mask.reshape(lat.size,lon.size,lags)
+#    #    map_proj = ccrs.Orthographic(central_longitude=int(cluster_out.longitude.mean()), central_latitude=0)
+#        map_proj = ccrs.LambertCylindrical(central_longitude=int(cluster_out.longitude.mean()))
+#        xrdata = xr.DataArray(data=Corr_lags, coords=[lat, lon, range(lags)], 
+#                                                      dims=['latitude','longitude','lag'], name='Corr Coeff')
+#        xrmask = xr.DataArray(data=sig_mask, coords=[lat, lon, range(lags)], 
+#                                                      dims=['latitude','longitude','lag'], name='Corr Coeff')
+#        vmin = xrdata.min() ; vmax = xrdata.max()
+##        g = xr.plot.FacetGrid(xrdata, row='lag', subplot_kws={'projection': map_proj},
+##                              aspect= (2*lon.size) / lat.size, size=3)
+#        for row in range(len(g.row_names)):
+#            xrdata_lag = xrdata.isel(lag=row)
+#            xrmask_lag = xrmask.isel(lag=row)
+##            sig_mask = xrdata_lag.copy()
+##            sig_mask.data = 
+#            ax = xrmask_lag.plot.contour(ax=g.axes[row,0], transform=ccrs.PlateCarree(),
+#                                         subplot_kws={'projection': map_proj}, colors=['black'],
+#                                         levels=[float(vmin),float(vmax)],add_colorbar=False)
+#            ax = xrdata_lag.plot.contourf(ax=g.axes[row,0], transform=ccrs.PlateCarree(),
+#                                          subplot_kws={'projection': map_proj})
+#            for ax in g.axes.flat:
+#                ax.coastlines()
+#            g.axes[0,0].set_title(var+'\nlag = {}'.format(row))
+#            g.fig
+#    ds = xrdata.to_dataset(name='precursor').precursor.sel(lag=range(lag_steps))
+#    fig = plt.figure(figsize=(6,4))
+#
+#    p = ds.plot(transform=ccrs.PlateCarree(),  # the data's projection
+#         col='lag', col_wrap=1,  # multiplot settings
+#         aspect= (2*lon.size) / lat.size,  # for a sensible figsize
+#         subplot_kws={'projection': map_proj})
+#    
+#    for ax in p.axes.flat:
+#        ax.coastlines()
+#     return g.fig
