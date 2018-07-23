@@ -4,7 +4,9 @@
 Created on Tue Jul 10 11:51:50 2018
 
 @author: semvijverberg
+
 """
+import matplotlib.pyplot as plt
 
 class Variable:
 
@@ -164,118 +166,77 @@ def save_figure(data, path):
     print('{} to path {}'.format(name, path))
     plt.savefig(os.path.join(path,name), format='jpeg', bbox_inches='tight')
 
-def xarray_plot_region(outd, lat, lon, map_proj):
+
+
+
+def xarray_plot_region(print_vars, outd, lag_min, lag_max, map_proj, tfreq):
     #%%
+#    (lag_min, lag_max, map_proj) = (exp['lag_min'], exp['lag_max'], map_proj)
     import cartopy.crs as ccrs
-    import seaborn as sns
+    import matplotlib.colors as colors
     import numpy as np
     import xarray as xr
-    map_proj = ccrs.LambertCylindrical(central_longitude=int(cluster_out.longitude.mean()))
-    map_proj = ccrs.Orthographic(central_longitude=int(cluster_out.longitude.mean()), central_latitude=0)
-    # testing with two sst field to plot variables in columns:
+#    map_proj = ccrs.LambertCylindrical(central_longitude=int(cluster_out.longitude.mean()))
+#    map_proj = ccrs.Orthograsphic(central_longitude=int(cluster_out.longitude.mean()), central_latitude=0)
     list_Corr = []
     list_mask = []
-    for var in outd.keys():
-        lags = outd[var].Corr_Coeff.shape[1]
-        variables = outd.keys()
+    if print_vars == 'all':
+        variables = outd.keys()[:]
+    else:
+        variables = print_vars
+        
+    for var in variables:
+        lags = range(lag_min, lag_max+1)
+        lags = ['{} ({} days)'.format(l, l*tfreq) for l in lags]
         lat = outd[var].lat_grid
         lon = outd[var].lon_grid
-        list_Corr.append(outd[var].Corr_Coeff.data[None,:,:].reshape(lat.size,lon.size,lags))
-        list_mask.append(outd[var].Corr_Coeff.mask[None,:,:].reshape(lat.size,lon.size,lags))
+        list_Corr.append(outd[var].Corr_Coeff.data[None,:,:].reshape(lat.size,lon.size,len(lags)))
+        list_mask.append(outd[var].Corr_Coeff.mask[None,:,:].reshape(lat.size,lon.size,len(lags)))
     Corr_regvar = np.array(list_Corr)
     mask_regvar = np.array(list_mask)
     
-#        Corr_regvar.shape
-
-    xrdata = xr.DataArray(data=Corr_regvar, coords=[variables, lat, lon, range(lags)], 
-                        dims=['vars','latitude','longitude','lag'], name='Corr Coeff')
-    xrmask = xr.DataArray(data=mask_regvar, coords=[variables, lat, lon, range(lags)], 
-                        dims=['vars','latitude','longitude','lag'], name='Corr Coeff')
-#    Corr_regvar = np.ma.concatenate(list_Corr[:],axis=0)
-    g = xr.plot.FacetGrid(xrdata, row='lag', col='vars', subplot_kws={'projection': map_proj},
-                      aspect= (2*lon.size) / lat.size, size=2)
-    vmin = xrdata.min() ; vmax = xrdata.max()
-    for var in variables:
-        col = variables.index(var)
-        for lag in range(lags):
-            row = lag
-            print lag, col
-            plotdata = xrdata.isel(lag=col, vars=row)
-            plotmask = xrmask.isel(lag=col, vars=row)
-            if lag == lags-1:
-                cbar = True
-            else:
-                cbar = False
-            sax = plotmask.plot.contour(ax=g.axes[col,row], transform=ccrs.PlateCarree(),
-                                         subplot_kws={'projection': map_proj}, colors=['black'],
-                                         levels=[float(vmin),float(vmax)],add_colorbar=False)
-            sax = plotdata.plot.contourf(ax=g.axes[col,row], transform=ccrs.PlateCarree(),
-                                          subplot_kws={'projection': map_proj},add_colorbar=True)
-#            if lag == lags-1:
-#                print True
-#                plt.colorbar(sax)
-    for ax in g.axes.flat:
-                ax.coastlines()
+    xrdata = xr.DataArray(data=Corr_regvar, coords=[variables, lat, lon, lags], 
+                        dims=['variable','latitude','longitude','lag'], name='Corr Coeff')
+    xrmask = xr.DataArray(data=mask_regvar, coords=[variables, lat, lon, lags], 
+                        dims=['variable','latitude','longitude','lag'], name='Corr Coeff')
+    g = xr.plot.FacetGrid(xrdata, col='variable', row='lag', subplot_kws={'projection': map_proj},
+                      aspect= (lon.size) / lat.size, size=3)
+    class MidpointNormalize(colors.Normalize):
+        def __init__(self, vmin=None, vmax=None, midpoint=None, clip=False):
+            self.midpoint = midpoint
+            colors.Normalize.__init__(self, vmin, vmax, clip)
     
-                #%%
-#    for ax in g.axes.flat:
-#        row = ax.rowNum
-#        col = ax.colNum
-#        print col,row
-#        plotdata = xrdata.isel(lag=col, vars=row)
-#        sax = plotdata.plot.contour(ax=g.axes[col,row], transform=ccrs.PlateCarree(),
-#                                         subplot_kws={'projection': map_proj}, colors=['black'],
-#                                         levels=[float(vmin),float(vmax)],add_colorbar=False)
-#        sax = plotdata.plot.contourf(ax=g.axes[col,row], transform=ccrs.PlateCarree(),
-#                                          subplot_kws={'projection': map_proj},add_colorbar=False)
-##        g.add_colorbar(0)
-#        
-#        if ax.numRows-1 == row:
-#            print True
-#            plt.colorbar(sax)
-##            g.add_colorbar()
-##            ax.colorbar()
-#    for ax in g.axes.flat:
-#                ax.coastlines()
-#    #%%
-#    for var in outd.keys():
-#        lags = outd[var].Corr_Coeff.shape[1]
-#        lat = outd[var].lat_grid
-#        lon = outd[var].lon_grid
-#        Corr_lags = outd[var].Corr_Coeff.data.reshape(lat.size,lon.size,lags)
-##        Corr_lags = np.ma.array(data = Corr_Coeff[:,:], mask = Corr_Coeff.mask[:,:])
-#        sig_mask = outd[var].Corr_Coeff.mask.reshape(lat.size,lon.size,lags)
-#    #    map_proj = ccrs.Orthographic(central_longitude=int(cluster_out.longitude.mean()), central_latitude=0)
-#        map_proj = ccrs.LambertCylindrical(central_longitude=int(cluster_out.longitude.mean()))
-#        xrdata = xr.DataArray(data=Corr_lags, coords=[lat, lon, range(lags)], 
-#                                                      dims=['latitude','longitude','lag'], name='Corr Coeff')
-#        xrmask = xr.DataArray(data=sig_mask, coords=[lat, lon, range(lags)], 
-#                                                      dims=['latitude','longitude','lag'], name='Corr Coeff')
-#        vmin = xrdata.min() ; vmax = xrdata.max()
-##        g = xr.plot.FacetGrid(xrdata, row='lag', subplot_kws={'projection': map_proj},
-##                              aspect= (2*lon.size) / lat.size, size=3)
-#        for row in range(len(g.row_names)):
-#            xrdata_lag = xrdata.isel(lag=row)
-#            xrmask_lag = xrmask.isel(lag=row)
-##            sig_mask = xrdata_lag.copy()
-##            sig_mask.data = 
-#            ax = xrmask_lag.plot.contour(ax=g.axes[row,0], transform=ccrs.PlateCarree(),
-#                                         subplot_kws={'projection': map_proj}, colors=['black'],
-#                                         levels=[float(vmin),float(vmax)],add_colorbar=False)
-#            ax = xrdata_lag.plot.contourf(ax=g.axes[row,0], transform=ccrs.PlateCarree(),
-#                                          subplot_kws={'projection': map_proj})
-#            for ax in g.axes.flat:
-#                ax.coastlines()
-#            g.axes[0,0].set_title(var+'\nlag = {}'.format(row))
-#            g.fig
-#    ds = xrdata.to_dataset(name='precursor').precursor.sel(lag=range(lag_steps))
-#    fig = plt.figure(figsize=(6,4))
-#
-#    p = ds.plot(transform=ccrs.PlateCarree(),  # the data's projection
-#         col='lag', col_wrap=1,  # multiplot settings
-#         aspect= (2*lon.size) / lat.size,  # for a sensible figsize
-#         subplot_kws={'projection': map_proj})
-#    
-#    for ax in p.axes.flat:
-#        ax.coastlines()
-#     return g.fig
+        def __call__(self, value, clip=None):
+            # I'm ignoring masked values and all kinds of edge cases to make a
+            # simple example...
+            x, y = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
+            return np.ma.masked_array(np.interp(value, x, y))
+    vmin = np.round(float(xrdata.min())-0.01,decimals=2) ; vmax = np.round(float(xrdata.max())+0.01,decimals=2)
+    clevels = np.linspace(-max(abs(vmin),vmax),max(abs(vmin),vmax),17) # choose uneven number for # steps
+    norm = MidpointNormalize(midpoint=0, vmin=clevels[0],vmax=clevels[-1])
+    cmap = 'RdBu'
+    for var in variables[:]:
+        col = variables.index(var)
+        xrdatavar = xrdata.sel(variable=var)
+        xrmaskvar = xrmask.sel(variable=var)
+        for lag in lags:
+            row = lags.index(lag)
+            print 'Plotting Corr maps {}, lag {}'.format(var, lag)
+            plotdata = xrdatavar.sel(lag=lag)
+            plotmask = xrmaskvar.sel(lag=lag)
+            plotmask.plot.contour(ax=g.axes[row,col], transform=ccrs.PlateCarree(),
+                                  subplot_kws={'projection': map_proj}, colors=['black'],
+                                  levels=[float(vmin),float(vmax)],add_colorbar=False)
+            im = plotdata.plot.contourf(ax=g.axes[row,col], transform=ccrs.PlateCarree(),
+                                        center=0,
+                                         levels=clevels, norm=norm, cmap=cmap,
+                                         subplot_kws={'projection':map_proj},add_colorbar=False)
+            
+            g.axes[row,col].coastlines()
+            
+    plt.tight_layout()
+    cbar_ax = g.fig.add_axes([0.25, 0.0, 0.5, 0.05]) #[left, bottom, width, height]
+    plt.colorbar(im, cax=cbar_ax , orientation='horizontal', norm=norm, 
+                 label='Corr Coefficient', ticks=clevels[::4], extend='neither')
+    #%%
+    return g.fig
