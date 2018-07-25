@@ -15,7 +15,6 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 import xarray as xr
 import cartopy.crs as ccrs
-
 retrieve_ERA_i_field = functions_pp.retrieve_ERA_i_field
 Variable = functions_pp.Variable
 import_array = functions_pp.import_array
@@ -37,17 +36,15 @@ if os.path.isdir(path_raw) == False : os.makedirs(path_raw)
 # *****************************************************************************
 # Information needed to download ncdf from ECMWF Public Datasets.
 # See http://apps.ecmwf.int/datasets/. 
-
 exp = dict(
      {'dataset'     :       'ERA-i',
      'grid_res'     :       2.5,
      'startyear'    :       1979,
      'endyear'      :       2017,
      #'vars'        :       [['name_RV','name_actor'],['ECMWF_var_codes'],['ECMWF levtypes'], ['vertical levels']]
-     'vars'         :       [['t2m', 'sst'],['167.128', '34.128'],['sfc', 'sfc'],[0, 0]],
+     'vars'         :       [['t2m', 'sst', 'u'],['167.128', '34.128', '131.128'],['sfc', 'sfc', 'pl'],[0, 0, '500']],
      'base_path'    :       base_path}
      )
-
 # Information needed to pre-process, select temporal frequency of data (must 
 # be an even number, otherwise you will split one day in half when taking 
 # temporal average), see comments in functions for more details.
@@ -83,8 +80,10 @@ for idx in range(len(exp['vars'][0]))[:]:
 # Step 2 Preprocess data (this function uses cdo and nco)
 # *****************************************************************************
     # First time: Read Docstring by typing 'functions_pp.preprocessing_ncdf?' in console
-    # Strongly recommended, see the function description to read what is does.
+    # Solve permission error by giving bash script execution right, read Docstring
+    # Strongly recommended, see the function description to read what it does.
     functions_pp.preprocessing_ncdf(var_class, exp)
+    
 # *****************************************************************************
 # Step 3 Select Response Variable period (which period of the year you want to predict)
 # *****************************************************************************
@@ -150,13 +149,16 @@ np.save(filename_exp_design, exp)
 #%%
 # *****************************************************************************
 # *****************************************************************************
-# Part 3 Run RGCPD python script with settings
+# Part 3 Start your experiment by running RGCPD python script with settings
 # *****************************************************************************
 # *****************************************************************************
-args = ['python {}'.format(os.path.join(script_dir, 'main_RGCPD_tig3.py')) +' '+ filename_exp_design]
-functions_pp.kornshell_with_input(args)
-
-
+# The RGCPD scripts runs with input filename_exp_design 
+import subprocess
+script_path = os.path.join(script_dir, 'main_RGCPD_tig3.py')
+bash_and_args = ['python', script_path]
+p = subprocess.Popen(bash_and_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+out = p.communicate(filename_exp_design)
+print(out[0])
 
 #%%
 

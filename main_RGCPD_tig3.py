@@ -36,20 +36,13 @@ import cartopy.crs as ccrs
 # Load 'exp' dictionairy with information of pre-processed data (variables, paths, filenames, etcetera..)
 # and add RGCPD/Tigrimate experiment settings
 # =============================================================================
-#filename_exp_design = '/Users/semvijverberg/surfdrive/Data_ERAint/t2m_sst_m5-8_dt14/13Jul-24Aug_ward/input_tig_dic.npy'
+filename_exp_design = '/Users/semvijverberg/surfdrive/Data_ERAint/t2m_sst_m5-8_dt14/13Jul-24Aug_ward/input_tig_dic.npy'
 #filename_exp_design = $1
 #filename_exp_design = sys.argv[0]
 #print filename_exp_design
 #
 #exit
-def main():
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--var_cf_code', type=str, 
-                        help="What variable do you want to retrieve, (in ECMWF cf parameter code)")
-    parser.print_help()
-    args = parser.parse_args()    
-    return args
+
 #%%
 exp = np.load(str(filename_exp_design)).item()
 # Response Variable is what we want to predict
@@ -155,9 +148,6 @@ class act:
         self.actbox = actbox
         self.tsCorr = tsCorr
         self.n_reg_perlag = n_reg_perlag
-
-# map for plotting the correlation maps
-#m = Basemap(projection='hammer',lon_0 = int(cluster_out.longitude.mean()) ,resolution='c')
 
 allvar = exp['vars'][0] # list of all variable names
 for var in allvar: # loop over all variables
