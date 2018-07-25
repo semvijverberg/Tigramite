@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 #%%
+# import socket
+# socket.gethostbyname('')
 script_dir = '/Users/semvijverberg/surfdrive/Scripts/Tigramite'
 import sys, os
 os.chdir(script_dir)
 sys.path.append('/Users/semvijverberg/surfdrive/Scripts/Tigramite')
 #import numpy
 import matplotlib
-matplotlib.rcParams['backend'] = "Qt4Agg"
+#matplotlib.rcParams['backend'] = "Qt4Agg"
 from mpl_toolkits.basemap import Basemap#, shiftgrid, cm
 from netCDF4 import Dataset
 from netCDF4 import num2date
@@ -29,14 +31,15 @@ import RGCPD_functions_version_04 as rgcpd
 #import tigramite
 
 import subprocess
-import functions_tig 
+from functions_tig import xarray_plot, xarray_plot_region
+import functions_tig
 import numpy as np
 import pandas as pd
 import xarray as xr
 import cartopy.crs as ccrs
-from inspect import getsourcelines
-def seefunction(func):
-    print getsourcelines(func)
+# from inspect import getsourcelines
+# def seefunction(func):
+#     print getsourcelines(func)
 # =============================================================================
 #  saving to github
 # =============================================================================
@@ -66,7 +69,7 @@ exp['lag_min'] = 3 # Lag time(s) of interest
 exp['lag_max'] = 4 
 # If your pp data is not a full year, there is Maximum meaningful lag given by: 
 #exp['lag_max'] = dates[dates.year == 1979].size - exp['RV_oneyr'].size
-exp['alpha_level_tig'] = 0.5 # Alpha level for final regression analysis by Tigrimate
+exp['alpha_level_tig'] = 0.2 # Alpha level for final regression analysis by Tigrimate
 exp['la_min'] = -89 # select domain of correlation analysis
 exp['la_max'] = 89
 exp['lo_min'] = -180
@@ -91,7 +94,6 @@ exp['path_output'] = os.path.join(exp['path_exp_clus'], 'output_tigr_SST_T2m/')
 n_years = dates.year.max() - dates.year.min() 
 timeperiod = '{}-{}'.format(RV.startyear, RV.endyear)
 time_range_all = [0, RV.dates_np.size]
-RV_indices = exp['RV_period']
 # =============================================================================
 # Mask for Response Variable
 # =============================================================================
@@ -113,11 +115,13 @@ fig_subpath_form = os.path.join(fig_path, '{}_pcA_SIGN{}_subinfo/'.format(params
                            exp['alpha_level_tig']))
 if os.path.isdir(fig_path) != True : os.makedirs(fig_path)
 
-#
+
 #==================================================================================
-# 1) Define index of interest (here: Polar vortex index based on gph)
+# Start of experiment
 #==================================================================================
-#====================================================================
+#==================================================================================
+# 1) Define index of interest 
+#==================================================================================
 # load preprocessed predictant 
 RV_array = np.squeeze(functions_tig.import_array(RV))
 RV_array, region_coords = functions_tig.find_region(RV_array, region='U.S.')
@@ -126,12 +130,11 @@ RV_array.shape
 time , nlats, nlons = RV_array.shape # [months , lat, lon]
 #=====================================================================================
 # mean over longitude and latitude
-functions_tig.xarray_plot(cluster_out)
 plt.imshow(RV_masked)
 # fix this
 RV_region = np.ma.masked_array(data=RV_array, mask=np.reshape(np.repeat(RV_masked, RV_array.time.size), RV_array.shape))
 RV1D = np.ma.mean(RV_region, axis = (1,2)) # take spatial mean with mask loaded in beginning
-RV_ts = RV1D[RV_indices] # extract specific months of MT index 
+RV_ts = RV1D[exp['RV_period']] # extract specific months of MT index 
 #
 
 # =============================================================================
@@ -139,7 +142,6 @@ RV_ts = RV1D[RV_indices] # extract specific months of MT index
 # =============================================================================
 # - calculate and plot pattern correltion for differnt fields
 # - create time-series over these regions 
-
 #=====================================================================================
 outd = dict()
 class act:
@@ -169,7 +171,7 @@ for var in allvar: # loop over all variables
     # Calculate correlation 
     # =============================================================================
     Corr_Coeff, lat_grid, lon_grid = rgcpd.calc_corr_coeffs_new(ncdf, array, box, RV_ts, time_range_all, exp['lag_min'], 
-                                                          exp['lag_max'], exp['time_cycle'], RV_indices, 
+                                                          exp['lag_max'], exp['time_cycle'], exp['RV_period'], 
                                                           exp['alpha_fdr'], FDR_control=exp['FDR_control'])
     Corr_Coeff = np.ma.array(data = Corr_Coeff[:,:], mask = Corr_Coeff.mask[:,:])
     # =============================================================================
@@ -192,24 +194,24 @@ for var in allvar: # loop over all variables
 
 if plotin1fig == True and showplot == True:
     variables = outd.keys()
-    fig = functions_tig.xarray_plot_region(variables, outd, exp['lag_min'],  exp['lag_max'], 
+    fig = functions_tig.xarray_plot_region(variables, outd, exp['lag_min'],  exp['lag_max'],
                                            map_proj, exp['tfreq'])
     fig_filename = '{}_vs_{}_{}'.format(allvar[0], var, params_combination) + file_type2
     plt.savefig(os.path.join(fig_path, fig_filename), bbox_inches='tight', dpi=200)
 
-                                                         
+
+
+
+
+
 #%%
 #=====================================================================================
 #
 # 4) PCMCI-algorithm
 #
 #=====================================================================================
-# ======================================================================================================================
-# Choose
-# ======================================================================================================================
 # alpha level for multiple linear regression model (last step)
 alpha_level = exp['alpha_level_tig']
-
 # p lets you choose the pcA alpha values
 for pc_alpha_name in exp['pcA_set']:
         
@@ -351,7 +353,9 @@ for pc_alpha_name in exp['pcA_set']:
             according_fullname = str(according_number) + according_varname   
             Corr_precursor = Corr_precursor_ALL[according_field_number]
 #            xr.DataArray(data=Corr_precursor, coords=[actor.lat_grid, actor.lon_grid], dims=('latitude','longitude'))
-            rgcpd.print_particular_region(according_number, Corr_precursor[:, :], actor.lat_grid, actor.lon_grid, m, according_fullname)
+            actor = outd[according_varname]
+            fig_region, A_number_region = rgcpd.print_particular_region(according_number, Corr_precursor[:, :], actor, map_proj, 
+                                                            according_fullname)
             fig_file = '{}_{}_{}_sign{}_{}{}'.format(according_fullname,
                         params_combination,pc_alpha_name,alpha_level,str(parents_RV[i][1]),file_type2)
             plt.savefig(os.path.join(fig_subpath, fig_file), dpi=250)   
@@ -368,152 +372,77 @@ for pc_alpha_name in exp['pcA_set']:
         else :
             print 'Index itself is also causal parent -> skipped' 
             print('*******************              ***************************                ******************')
-
+#%%
 # =============================================================================
 #   Plotting all fields significant at alpha_level_tig
 # =============================================================================
+    all_regnumbers_tig = [reg[0] for reg in parents_RV]
+    Corr_Coeff_all_r_l = np.ma.concatenate(Corr_precursor_ALL[:],axis=1)
+    lags = Corr_Coeff_all_r_l.shape[1]
     # stack all variables and lags togther to plot them in same basemap
-#    Corr_Coeff_all_r_l = np.ma.concatenate(Corr_precursor_ALL[:],axis=1)
-#    all_regions = np.ma.masked_all(Corr_Coeff_all_r_l[:,0].shape)
-#    all_regions_tig = np.ma.masked_all(Corr_Coeff_all_r_l[:,0].shape)
-#    for i in range(Corr_Coeff_all_r_l.shape[1]):
-#        regions_i = rgcpd.define_regions_and_rank_new(Corr_Coeff_all_r_l[:,i], actor.lat_grid, actor.lon_grid)
-#        regions_i = np.nan_to_num(regions_i)
-#
-#        all_regnumbers_tig = [reg[0] for reg in parents_RV]
-#        indices_regs = np.where(regions_i >1)[0]
-#        for i in indices_regs:
-#            all_regions[i] = regions_i[i]
-#            if regions_i[i] in all_regnumbers_tig:
-#                all_regions_tig[i] = regions_i[i]
-#    all_regions = all_regions.reshape((actor.lat_grid.size, actor.lon_grid.size))
-#    all_regions_tig = all_regions_tig.reshape((actor.lat_grid.size, actor.lon_grid.size))
-#
-#    
-#    m.drawcoastlines(color='gray', linewidth=0.35)
-#    m.drawmapboundary(fill_color='white', color='white')
-#    lon_mesh, lat_mesh = np.meshgrid(lon_grid, lat_grid)
-#    m.contourf(lon_mesh,lat_mesh, all_regions_tig, latlon = True)
-#    plt.title('{}-{} {} tfreq{}days'.format(RV.name, RV.dataset, timeperiod, exp['tfreq']))
-#    file_name = '{}_{}_SIGN{}_all'.format(params_combination, pc_alpha_name, alpha_level)
-#    plt.savefig(os.path.join(fig_subpath, file_name + file_type1))
-#    plt.savefig(os.path.join(fig_path, file_name + file_type2),dpi=250)  
-# =============================================================================
-#                 
-# =============================================================================
-#    if plot_all == True:
-##        m = Basemap(projection='hammer',lon_0 = 0 ,resolution='c')     #300       
-#        #plt.plot()
-#        count = 0
-#        #fig = plt.figure(figsize=(6, 4))
-#        fig = plt.subplots(figsize=(6, 4))
-#         	
-#        for i in range(n_parents):
-#            link_number = parents_RV[i][0]
-#            lag = np.abs(parents_RV[i][1])-1
-#            #==========================================================================
-#            # save precursos indices form fulldata, to be stored and used to find the 
-#            # precursors of the precursors
-#            #==========================================================================
-#            index_in_fulldata = parents_RV[i][0]
-#            if index_in_fulldata>0:
-#               
-#                according_varname = var_names[index_in_fulldata][1]
-#                according_number = var_names[index_in_fulldata][0]
-#                according_field_number = var_names[index_in_fulldata][2]
-#                # *********************************************************
-#                # print and save only sign regions
-#                # *********************************************************
-#                according_fullname = str(according_number) + according_varname   
-#                Corr_precursor = Corr_precursor_ALL[according_field_number]
-#               
-#                #oad.print_particular_region(according_number, Corr_precursor[:, exp['lag_min'] - 1:], lat_grid_v200, lon_grid_v200, m, according_fullname)
-#                #rgcpd.print_particular_region(according_number, Corr_precursor[:, :], lat_grid_v200, lon_grid_v200, m, according_fullname)
-#                # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-#                number_region = according_number
-#                Corr_Coeff = Corr_precursor[:, :]
-#                
-#                title  = according_fullname
-#                # preparations
-#                lag_steps = Corr_Coeff.shape[1]
-#                lat_len = actor.lat_grid.shape[0]
-#                lon_len = actor.lon_grid.shape[0]
-#                
-#                 	
-#                cmap_regions = matplotlib.colors.ListedColormap(sns.color_palette("Set2"))
-#                cmap_regions.set_bad('w')
-#                               
-##                x = 0
-##                vmax = 50
-##                for i in range(lag_steps):
-##                    Regions_lag_i = rgcpd.define_regions_and_rank_new(Corr_Coeff[:,i], actor.lat_grid, actor.lon_grid)
-##                    n_regions_lag_i = int(Regions_lag_i.max())
-##                		
-##                    x_reg = np.max(Regions_lag_i)	
-##                    levels = np.arange(x, x + x_reg +1)+.5
-#                    
-##                    A_r = A_r + x
-##                				
-##                    x = A_r.max() 
-##                		
-##                    print x
-##                    if x >= number_region:
-##                        A_number_region = np.zeros(A_r.shape)
-##                			
-##                        A_number_region[A_r == number_region]=1
-##                        A_number_region[A_r != number_region]=np.nan
-##                        #values[ values==0 ] = np.nan
-##                        print('count')
-##                        print(count)
-##                        if count == 0:
-##                            cs =  m.contourf(lon_mesh,lat_mesh, A_number_region, latlon = True, colors = ["deepskyblue", "black", "white"]) #SLP
-##                        elif count == 1:
-##                            cs1 =  m.contourf(lon_mesh,lat_mesh, A_number_region, latlon = True, colors = ["royalblue" , "black", "white"]) #V200Japan
-##                        elif count == 2:
-##                            cs2 =  m.contourf(lon_mesh,lat_mesh, A_number_region, latlon = True, colors = ["lightsalmon","black", "white"]) #V200Panama
-##                        elif count == 3:
-##                            cs3 =  m.contourf(lon_mesh,lat_mesh, A_number_region, latlon = True,colors = ["crimson", "black", "white"]) #V200Arctic
-##                        elif count == 4:
-##                            cs4 =  m.contourf(lon_mesh,lat_mesh, A_number_region, latlon = True,colors = ["sandybrown", "black", "white"])
-##                        elif count == 5:
-##                            cs5 =  m.contourf(lon_mesh,lat_mesh, A_number_region, latlon = True,colors = ["royalblue", "black", "white"])
-##                            
-##                        elif count == 6:
-##                            cs6 =  m.contourf(lon_mesh,lat_mesh, A_number_region, latlon = True,colors = ["khaki", "black", "white"])
-#                		
-#                		  #if colors should be different for each subplot:
-#                        #m.contourf(lon_mesh,lat_mesh, A_r, levels, latlon = True, cmap = cmap_regions, vmin = 1, cmax = vmax)
-#                        #m.colorbar(location="bottom")
-#                        
-##                        m.drawcoastlines(color='gray', linewidth=0.35)
-##                        m.drawmapboundary(fill_color='white', color='gray')
-##                    
-##                        plt.title('{}-{} {} tfreq{}days'.format(RV.name, RV.dataset, timeperiod, exp['tfreq']))
-##                        file_name = '{}_{}_SIGN{}_all'.format(params_combination, pc_alpha_name, alpha_level)
-##                        plt.savefig(os.path.join(fig_subpath, file_name + file_type1))
-##                        plt.savefig(os.path.join(fig_path, file_name + file_type2),dpi=250)
-#                # *********************************************************
-#                according_fullname = str(according_number) + according_varname
-#                name = ''.join([str(index_in_fulldata),'_',according_fullname])
-#                count = count +1
-#                print("count")
-#                print(count)
-#            else :
-#                print 'Index itself is also causal parent -> skipped' 
-#                print('*******************              ***************************                ******************')
-#        
-#        else:
-#            print("vars not sign at alpha = 0.05")
-            
+    all_regions_corr = np.zeros((actor.lat_grid.size * actor.lon_grid.size))
+    all_regions_tig = np.zeros((actor.lat_grid.size * actor.lon_grid.size))
+    all_regions_del = np.zeros((actor.lat_grid.size * actor.lon_grid.size))
+    for i in range(lags):
+        regions_i = rgcpd.define_regions_and_rank_new(Corr_Coeff_all_r_l[:,i], actor.lat_grid, actor.lon_grid)
+        regions_i = np.nan_to_num(regions_i)
+
+        indices_regs = np.where( regions_i >= 0.5 )[0]
+        for i in indices_regs:
+            all_regions_corr[i] = regions_i[i]
+            all_regions_del[i]  = regions_i[i]
+            if regions_i[i] in all_regnumbers_tig:
+                
+                all_regions_tig[i] = regions_i[i]
+                all_regions_del[i]      = 0
+    all_regions_corr = all_regions_corr.reshape((actor.lat_grid.size, actor.lon_grid.size))
+    all_regions_tig = all_regions_tig.reshape((actor.lat_grid.size, actor.lon_grid.size))
+    all_regions_del = all_regions_del.reshape((actor.lat_grid.size, actor.lon_grid.size))
+    array = np.concatenate( (all_regions_corr[None,:,:], all_regions_tig[None,:,:]), axis=0)
+    array = np.ma.masked_equal(array, 0)
+    all_regions_del[all_regions_del > 0] = 1
+    names = ['all regions significant Corr', 'all regions significant Tig']
+    lat = actor.lat_grid
+    lon = actor.lon_grid
+    cmap = 'tab20c'
+    #%%
+    xrdata = xr.DataArray(data=array, coords=[names, lat, lon], 
+                        dims=['names','latitude','longitude'], name='Corr Coeff')
+    clevels = np.arange(int(xrdata.min()), int(xrdata.max())+1)
+    g = xr.plot.FacetGrid(xrdata, col='names', subplot_kws={'projection': map_proj},
+                      aspect= (lon.size) / lat.size, size=3)
     
-#    m.drawcoastlines(color='gray', linewidth=0.35)
-#    m.drawmapboundary(fill_color='white', color='gray')
-#
-#    plt.title('{}-{} {} tfreq{}days'.format(RV.name, RV.dataset, timeperiod, exp['tfreq']))
-#    file_name = '{}_{}_SIGN{}_all'.format(params_combination, pc_alpha_name, alpha_level)
-#    plt.savefig(os.path.join(fig_subpath, file_name + file_type1))
-#    plt.savefig(os.path.join(fig_path, file_name + file_type2),dpi=250)
+    plotdata = xrdata.sel(names=names[0])
+    im = plotdata.plot.contourf(ax=g.axes[0,0], transform=ccrs.PlateCarree(),
+                                        cmap=cmap, levels=clevels, alpha=1.,
+                                        subplot_kws={'projection':map_proj},
+                                        add_colorbar=False)
+    plotdata = xrdata.sel(names=names[0]) 
+    plotdata.values = all_regions_del
+    im = plotdata.plot.contour(ax=g.axes[0,0], transform=ccrs.PlateCarree(),
+                                        colors=['black'], 
+                                        subplot_kws={'projection':map_proj})
+    g.axes[0,0].set_title(names[0], fontsize='x-large')
+    g.axes[0,0].text(0.5, -0.1, 'Black contours are not significant after MCI',
+                      horizontalalignment='center', fontsize='x-large',
+                      verticalalignment='center', transform=g.axes[0,0].transAxes)
+    plotdata = xrdata.sel(names=names[1])
+    im = plotdata.plot.contourf(ax=g.axes[0,1], transform=ccrs.PlateCarree(),
+                                        cmap=cmap, levels=clevels,
+                                        subplot_kws={'projection':map_proj},
+                                        add_colorbar=False)
+    g.axes[0,1].set_title(names[1], fontsize='x-large')
+    for ax in g.axes.flat:
+        ax.coastlines(color='grey')
     
+    plt.tight_layout()
+    cbar_ax = g.fig.add_axes([0.25, 0.0, 0.5, 0.05])
+    plt.colorbar(im, cax=cbar_ax, orientation='horizontal')
+    file_name = 'new_{}_{}_SIGN{}_all'.format(params_combination, pc_alpha_name, alpha_level)
+    plt.savefig(os.path.join(fig_path, file_name + file_type2),dpi=250)
+#    plt.savefig(os.path.join(fig_subpath, file_name + file_type1))
+
+    #%%
     # *****************************************************************************
     # save output if SaveTF == True
     # *****************************************************************************

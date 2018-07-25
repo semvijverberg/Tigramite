@@ -55,6 +55,21 @@ for idx in range(len(exp['vars'][0]))[:]:
 #        functions_pp.preprocessing_ncdf(var_class, exp)
     functions_pp.preprocessing_ncdf(var_class, exp)
 # =============================================================================
+# Select Response Variable period (which period you want to predict)
+# =============================================================================
+# Select reponse variable period
+RV = exp[exp['vars'][0][0]]
+marray, RV = functions.import_array(RV, path='pp')
+one_year = RV.dates_np.where(RV.dates_np.year == RV.startyear+1).dropna()
+months = [7,8] # Selecting the timesteps of 14 day mean ts that fall in juli and august
+RV_period = []
+for mon in months:
+    RV_period.insert(-1, np.where(RV.dates_np.month == mon)[0] )
+RV_period = [x for sublist in RV_period for x in sublist]
+RV_period.sort()
+exp['RV_period'] = RV_period
+
+# =============================================================================
 # Save Experiment design
 # =============================================================================
 np.save(os.path.join(var_class.path_pp, exp['exp_pp']+'_pp_dic.npy'), exp)

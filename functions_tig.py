@@ -126,7 +126,7 @@ def xarray_plot(data, path='default', saving=False):
                              transform=ccrs.PlateCarree(), add_colorbar=True)
     if saving == True:
         save_figure(data, path=path)
-    plt.show()
+    return
     
 def convert_longitude(data):
     import numpy as np

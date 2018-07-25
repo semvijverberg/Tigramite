@@ -18,6 +18,8 @@ from matplotlib.patches import Polygon
 from matplotlib import gridspec
 import seaborn as sns
 from statsmodels.sandbox.stats import multicomp
+import xarray as xr
+import cartopy.crs as ccrs
 
 
 
@@ -650,74 +652,60 @@ def calc_actor_ts_and_plot(Corr_GPH, GPH_box_anom, lag_min, lat_grid_gph, lon_gr
 	
 
 	
-def print_particular_region(number_region, Corr_GPH, lat_grid_gph, lon_grid_gph, m, title):
+def print_particular_region(number_region, Corr_Coeff_lag_i, actor, map_proj, title):
+
+#    (number_region, Corr_Coeff_lag_i, latitudes, longitudes, map_proj, title)=(according_number, Corr_precursor[:, :], actor.lat_grid, actor.lon_grid, map_proj, according_fullname) 
+    #%%
+    # check if only one lag is tested:
+    if Corr_Coeff_lag_i.ndim == 1:
+        lag_steps = 1
+
+    else:
+        lag_steps = Corr_Coeff_lag_i.shape[1]
+
+    latitudes = actor.lat_grid
+    longitudes = actor.lon_grid
+    
+    x = 0
+    for i in range(lag_steps):
 	
-	# check if only one lag is tested:
-	if Corr_GPH.ndim == 1:
-		lag_steps = 1
-
-	else:
-		lag_steps = Corr_GPH.shape[1]
-
-	# plotting preparations
-	la_gph = lat_grid_gph.shape[0]
-	lo_gph = lon_grid_gph.shape[0]
-	lons_gph, lats_gph = numpy.meshgrid(lon_grid_gph, lat_grid_gph)
-
-	
-	#test = [len(a) for a in Actors_ts_GPH]
-	#print test
-	fig_region = plt.figure(figsize=(6, 4))
-	
-	#cmap_regions = matplotlib.colors.ListedColormap(sns.color_palette("Set2"))
-	#cmap_regions.set_bad('w')
-
-
-	x = 0
-	# vmax = 50
-	for i in range(lag_steps):
-	
-		if Corr_GPH.ndim == 1:
-			Regions_lag_i = define_regions_and_rank_new(Corr_GPH, lat_grid_gph, lon_grid_gph)
+        if Corr_Coeff_lag_i.ndim == 1:
+            Regions_lag_i = define_regions_and_rank_new(Corr_Coeff_lag_i, latitudes, longitudes)
 		
-		else:	
-			Regions_lag_i = define_regions_and_rank_new(Corr_GPH[:,i], lat_grid_gph, lon_grid_gph)
+        else:	
+            Regions_lag_i = define_regions_and_rank_new(Corr_Coeff_lag_i[:,i], latitudes, longitudes)
 		
+        if Regions_lag_i.count()==0:
+            n_regions_lag_i = 0
 		
-		
-		if Regions_lag_i.count()==0:
-			n_regions_lag_i = 0
-		
-		else:
-			n_regions_lag_i = int(Regions_lag_i.max())
-			x_reg = numpy.max(Regions_lag_i)	
-			levels = numpy.arange(x, x + x_reg +1)+.5
+        else:	
+            n_regions_lag_i = int(Regions_lag_i.max())
+            x_reg = numpy.max(Regions_lag_i)	
+            levels = numpy.arange(x, x + x_reg +1)+.5
 
 		
-			A_r = numpy.reshape(Regions_lag_i, (la_gph, lo_gph))
-			A_r = A_r + x			
-			x = A_r.max() 
+            A_r = numpy.reshape(Regions_lag_i, (latitudes.size, longitudes.size))
+            A_r = A_r + x			
+            x = A_r.max() 
+            print x
 		
-		print x
 		
-		
-		if (x >= number_region) & (x>0):
+        if (x >= number_region) & (x>0):
 					
-			A_number_region = numpy.zeros(A_r.shape)
-			A_number_region[A_r == number_region]=1
-			
-			plt.plot()
-			plt.title(title)
-			plot_basemap_options(m)		
-			m.contourf(lons_gph,lats_gph, A_number_region, latlon = True)
-			# if colors should be different for each subplot:
-			#m.contourf(lons_gph,lats_gph, A_r, levels, latlon = True, cmap = cmap_regions, vmin = 1, cmax = vmax)
-			# m.colorbar(location="bottom")
-			
-			break
+            A_number_region = numpy.zeros(A_r.shape)
+            A_number_region[A_r == number_region]=1
+            xr_A_num_reg = xr.DataArray(data=A_number_region, coords=[latitudes, longitudes], dims=('latitude','longitude'))
+            map_proj = map_proj
+            fig_region = plt.figure(figsize=(6, 4))
+            ax = plt.axes(projection=map_proj)
+            ax.coastlines()
+            im = xr_A_num_reg.plot.pcolormesh(ax=ax, cmap=plt.cm.BuPu,
+                             transform=ccrs.PlateCarree(), add_colorbar=False)
+            plt.colorbar(im, ax=ax , orientation='horizontal')
+            ax.set_title(title)
+            break
 
-	
-	return fig_region, A_number_region
+    return fig_region, A_number_region
 
 	
 		
