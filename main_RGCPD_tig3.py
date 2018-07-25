@@ -18,20 +18,6 @@ from tigramite import data_processing as pp
 from tigramite.pcmci import PCMCI
 from tigramite.independence_tests import ParCorr, GPDC, CMIknn, CMIsymb
 import RGCPD_functions_version_04 as rgcpd
-#from tigramite import plotting as tp
-#from tigramite.models import LinearMediation, Prediction
-#import statsmodels.api as sm
-#from sklearn import preprocessing
-#from datetime import datetime, date, timedelta
-#from matplotlib.dates import YearLocator, MonthLocator, DateFormatter
-#import scipy
-#from scipy import signal
-#from matplotlib import gridspec
-#import sklearn
-#import tigramite
-
-import subprocess
-from functions_tig import xarray_plot, xarray_plot_region
 import functions_tig
 import numpy as np
 import pandas as pd
@@ -50,44 +36,65 @@ import cartopy.crs as ccrs
 # Load 'exp' dictionairy with information of pre-processed data (variables, paths, filenames, etcetera..)
 # and add RGCPD/Tigrimate experiment settings
 # =============================================================================
-exp_clus = '13Jul-24Aug_ward'
-path_exp_clus = os.path.join('/Users/semvijverberg/surfdrive/Data_ERAint/t2m_sst_m5-8_dt14/', exp_clus)
-exp = np.load(os.path.join(path_exp_clus, 'raw_input_tig_dic.npy')).item()
+#filename_exp_design = '/Users/semvijverberg/surfdrive/Data_ERAint/t2m_sst_m5-8_dt14/13Jul-24Aug_ward/input_tig_dic.npy'
+#filename_exp_design = $1
+#filename_exp_design = sys.argv[0]
+#print filename_exp_design
+#
+#exit
+def main():
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--var_cf_code', type=str, 
+                        help="What variable do you want to retrieve, (in ECMWF cf parameter code)")
+    parser.print_help()
+    args = parser.parse_args()    
+    return args
+#%%
+exp = np.load(str(filename_exp_design)).item()
 # Response Variable is what we want to predict
 RV = exp['t2m']
 file_path = os.path.join(RV.path_pp, RV.filename_pp)
 ncdf = Dataset(file_path)
 numtime = ncdf.variables['time']
 dates = pd.to_datetime(num2date(numtime[:], units=numtime.units, calendar=numtime.calendar))
-print("\nBelow printing dates accross years, should be all same day (otherwise ydaymean not appropriate")
-print(dates[::dates[dates.year == 1979].size])
-exp['clus_anom_std'] = 1
-exp['alpha'] = 0.01 # set significnace level for correlation maps
-exp['alpha_fdr'] = 2*exp['alpha'] # conservative significance level
-exp['FDR_control'] = False # Do you want to use the conservative alpha_fdr or normal alpha?
-exp['lag_min'] = 3 # Lag time(s) of interest
-exp['lag_max'] = 4 
-# If your pp data is not a full year, there is Maximum meaningful lag given by: 
-#exp['lag_max'] = dates[dates.year == 1979].size - exp['RV_oneyr'].size
-exp['alpha_level_tig'] = 0.2 # Alpha level for final regression analysis by Tigrimate
-exp['la_min'] = -89 # select domain of correlation analysis
-exp['la_max'] = 89
-exp['lo_min'] = -180
-exp['lo_max'] = 360
+#print("\nBelow printing dates accross years, should be all same day (otherwise ydaymean not appropriate")
+#print(dates[::dates[dates.year == 1979].size])
+
+#exp['alpha'] = 0.01 # set significnace level for correlation maps
+#exp['alpha_fdr'] = 2*exp['alpha'] # conservative significance level
+#exp['FDR_control'] = False # Do you want to use the conservative alpha_fdr or normal alpha?
+#exp['lag_min'] = 3 # Lag time(s) of interest
+#exp['lag_max'] = 4 
+## If your pp data is not a full year, there is Maximum meaningful lag given by: 
+##exp['lag_max'] = dates[dates.year == 1979].size - exp['RV_oneyr'].size
+#exp['alpha_level_tig'] = 0.2 # Alpha level for final regression analysis by Tigrimate
+#exp['la_min'] = -89 # select domain of correlation analysis
+#exp['la_max'] = 89
+#exp['lo_min'] = -180
+#exp['lo_max'] = 360
+#exp['time_cycle'] = dates[dates.year == 1979].size # time-cycle of data. total timesteps in one year
+#pcA_sets = dict({   # dict of sets of pc_alpha values
+#      'pcA_set1a' : [ 0.05], # 0.05 0.01 
+#      'pcA_set1b' : [ 0.01], # 0.05 0.01 
+#      'pcA_set1c' : [ 0.1], # 0.05 0.01 
+#      'pcA_set2'  : [ 0.2, 0.1, 0.05, 0.01, 0.001], # set2
+#      'pcA_set3'  : [ 0.1, 0.05, 0.01], # set3
+#      'pcA_set4'  : [ 0.5, 0.4, 0.3, 0.2, 0.1], # set4
+#      'pcA_none'  : None # default
+#      })
+#exp['pcA_set'] = ['pcA_set1a'] 
+
+#exp['path_output'] = os.path.join(exp['path_exp_mask_region'], 'output_tigr_SST_T2m/')
 exp['time_cycle'] = dates[dates.year == 1979].size # time-cycle of data. total timesteps in one year
-pcA_sets = dict({   # dict of sets of pc_alpha values
-      'pcA_set1a' : [ 0.05], # 0.05 0.01 
-      'pcA_set1b' : [ 0.01], # 0.05 0.01 
-      'pcA_set1c' : [ 0.1], # 0.05 0.01 
-      'pcA_set2'  : [ 0.2, 0.1, 0.05, 0.01, 0.001], # set2
-      'pcA_set3'  : [ 0.1, 0.05, 0.01], # set3
-      'pcA_set4'  : [ 0.5, 0.4, 0.3, 0.2, 0.1], # set4
-      'pcA_none'  : None # default
-      })
-exp['pcA_set'] = ['pcA_set1a'] 
-params_combination = 'lag{}to{}_aCorr{}'.format(exp['lag_min'],
-                         exp['lag_max'], exp['alpha'])
-exp['path_output'] = os.path.join(exp['path_exp_clus'], 'output_tigr_SST_T2m/')
+## =============================================================================
+## Mask for Response Variable
+## =============================================================================
+#cluster = 0
+#exp['clus_anom_std'] = 1
+#clusters = np.squeeze(xr.Dataset.from_dict(np.load(os.path.join(exp['path_exp_mask_region'], 'clusters_dic.npy')).item()).to_array())
+#cluster_out = clusters.sel(cluster=cluster)
+#exp['RV_masked'] = np.ma.masked_where((cluster_out < exp['clus_anom_std']*cluster_out.std()), cluster_out).mask
 #=====================================================================================
 # Information on period taken for response-variable, already decided in main_download_and_pp
 #=====================================================================================
@@ -95,16 +102,11 @@ n_years = dates.year.max() - dates.year.min()
 timeperiod = '{}-{}'.format(RV.startyear, RV.endyear)
 time_range_all = [0, RV.dates_np.size]
 # =============================================================================
-# Mask for Response Variable
-# =============================================================================
-cluster = 0
-clusters = np.squeeze(xr.Dataset.from_dict(np.load(os.path.join(exp['path_exp_clus'], 'clusters_dic.npy')).item()).to_array())
-cluster_out = clusters.sel(cluster=cluster)
-RV_masked = np.ma.masked_where((cluster_out < exp['clus_anom_std']*cluster_out.std()), cluster_out).mask
-# =============================================================================
 # Figure/Plotting settings
 # =============================================================================
-map_proj = ccrs.LambertCylindrical(central_longitude=int(cluster_out.longitude.mean()))
+params_combination = 'lag{}to{}_aCorr{}'.format(exp['lag_min'],
+                         exp['lag_max'], exp['alpha'])
+map_proj = exp['map_proj']
 file_type1 = ".pdf"
 file_type2 = ".png"
 SaveTF = True
@@ -130,9 +132,9 @@ RV_array.shape
 time , nlats, nlons = RV_array.shape # [months , lat, lon]
 #=====================================================================================
 # mean over longitude and latitude
-plt.imshow(RV_masked)
+plt.imshow(exp['RV_masked'])
 # fix this
-RV_region = np.ma.masked_array(data=RV_array, mask=np.reshape(np.repeat(RV_masked, RV_array.time.size), RV_array.shape))
+RV_region = np.ma.masked_array(data=RV_array, mask=np.reshape(np.repeat(exp['RV_masked'], RV_array.time.size), RV_array.shape))
 RV1D = np.ma.mean(RV_region, axis = (1,2)) # take spatial mean with mask loaded in beginning
 RV_ts = RV1D[exp['RV_period']] # extract specific months of MT index 
 #
@@ -155,7 +157,7 @@ class act:
         self.n_reg_perlag = n_reg_perlag
 
 # map for plotting the correlation maps
-m = Basemap(projection='hammer',lon_0 = int(cluster_out.longitude.mean()) ,resolution='c')
+#m = Basemap(projection='hammer',lon_0 = int(cluster_out.longitude.mean()) ,resolution='c')
 
 allvar = exp['vars'][0] # list of all variable names
 for var in allvar: # loop over all variables
@@ -180,7 +182,7 @@ for var in allvar: # loop over all variables
     actbox = rgcpd.extract_data(ncdf, array, time_range_all, box)
     actbox = np.reshape(actbox, (actbox.shape[0], -1))
     tsCorr, n_reg_perlag = rgcpd.calc_actor_ts_and_plot(Corr_Coeff, actbox, 
-                            exp['lag_min'], lat_grid, lon_grid, m, var)
+                            exp['lag_min'], lat_grid, lon_grid, var)
     outd[var] = act(var, Corr_Coeff, lat_grid, lon_grid, actbox, tsCorr, n_reg_perlag)
     # =============================================================================
     # Plot    
@@ -220,7 +222,7 @@ for pc_alpha_name in exp['pcA_set']:
     '''
     save output
     '''
-    pc_alpha = pcA_sets[pc_alpha_name]   
+    pc_alpha = exp['pcA_sets'][pc_alpha_name]   
     insertpca = fig_subpath_form.split('pcA')
     fig_subpath = insertpca[0] + '{}'.format(pc_alpha_name) + insertpca[1]
     if os.path.isdir(fig_subpath):
@@ -304,7 +306,6 @@ for pc_alpha_name in exp['pcA_set']:
     
     all_parents = sig['parents']
     link_matrix = sig['link_matrix']
-    #%%
     """
     what's this?
     med = LinearMediation(dataframe=dataframe,            
@@ -372,7 +373,6 @@ for pc_alpha_name in exp['pcA_set']:
         else :
             print 'Index itself is also causal parent -> skipped' 
             print('*******************              ***************************                ******************')
-#%%
 # =============================================================================
 #   Plotting all fields significant at alpha_level_tig
 # =============================================================================
@@ -391,8 +391,7 @@ for pc_alpha_name in exp['pcA_set']:
         for i in indices_regs:
             all_regions_corr[i] = regions_i[i]
             all_regions_del[i]  = regions_i[i]
-            if regions_i[i] in all_regnumbers_tig:
-                
+            if regions_i[i] in all_regnumbers_tig:            
                 all_regions_tig[i] = regions_i[i]
                 all_regions_del[i]      = 0
     all_regions_corr = all_regions_corr.reshape((actor.lat_grid.size, actor.lon_grid.size))
@@ -405,7 +404,7 @@ for pc_alpha_name in exp['pcA_set']:
     lat = actor.lat_grid
     lon = actor.lon_grid
     cmap = 'tab20c'
-    #%%
+
     xrdata = xr.DataArray(data=array, coords=[names, lat, lon], 
                         dims=['names','latitude','longitude'], name='Corr Coeff')
     clevels = np.arange(int(xrdata.min()), int(xrdata.max())+1)
@@ -442,7 +441,6 @@ for pc_alpha_name in exp['pcA_set']:
     plt.savefig(os.path.join(fig_path, file_name + file_type2),dpi=250)
 #    plt.savefig(os.path.join(fig_subpath, file_name + file_type1))
 
-    #%%
     # *****************************************************************************
     # save output if SaveTF == True
     # *****************************************************************************

@@ -504,7 +504,7 @@ def define_regions_and_rank_new(Corr_Coeff, lat_grid, lon_grid):
 
 	
 
-def calc_actor_ts_and_plot(Corr_GPH, GPH_box_anom, lag_min, lat_grid_gph, lon_grid_gph, m, var):
+def calc_actor_ts_and_plot(Corr_GPH, GPH_box_anom, lag_min, lat_grid_gph, lon_grid_gph, var):
 	
 	"""
 	Calculates the time-series of the actors based on the correlation coefficients and plots the according regions. 

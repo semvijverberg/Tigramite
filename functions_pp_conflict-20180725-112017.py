@@ -136,7 +136,10 @@ def retrieve_ERA_i_field(cls):
         print("convert operational 6hrly data to daily means")
         args = ['cdo daymean {} {}'.format(file_path.replace('daily','oper'), file_path)]
         kornshell_with_input(args)
+
+
     return
+
         
 def kornshell_with_input(args):
     '''some kornshell with input '''
@@ -164,19 +167,6 @@ def kornshell_with_input(args):
 
 
 def preprocessing_ncdf(cls, exp):
-    ''' 
-    This function does some python manipulation based on your experiment 
-    to create the corresponding cdo commands. 
-    A kornshell script is created in the folder bash_scripts. First time you
-    run it, it will give execution rights error. Open terminal -> go to 
-    bash_scrips folder -> type 'chmod 755 bash_script.sh' to give exec rights.
-    - Select time period of interest from daily mean time series
-    - Do timesel mean based on your exp['tfreq']
-    - Make sure the calenders are the same, dates are used to select data by xarray
-    - Gridpoint detrending
-    - Calculate anomalies (w.r.t. multi year daily means)
-    - deletes time bonds from the variables
-    '''
     import os
     from netCDF4 import Dataset
     from netCDF4 import num2date
@@ -227,12 +217,16 @@ def preprocessing_ncdf(cls, exp):
 # =============================================================================
     outfilename = cls.filename[:-3]+'.nc'
     outfilename = outfilename.replace('daily', 'dt-{}days'.format(exp['tfreq']))
-    outfilename = outfilename.replace('_{}_'.format(1),'_{}{}_'.format(start_day.day, start_day.month_name()[:3]))
-    outfilename = outfilename.replace('_{}_'.format(12),'_{}{}_'.format(end_day.day, end_day.month_name()[:3]))
-    cls.path_pp = os.path.join(exp['path_exp_pp'], 'input_pp')
-    if os.path.isdir(cls.path_pp) == False: os.makedirs(cls.path_pp)
+    outfilename = outfilename.replace('_{}_'.format(exp['dstartmonth']),'_{}{}_'.format(start_day.day, start_day.month_name()[:3]))
+    outfilename = outfilename.replace('_{}_'.format(exp['dendmonth']),'_{}{}_'.format(end_day.day, end_day.month_name()[:3]))
+    cls.path_pp = os.path.join(cls.base_path, exp['exp_pp'], 'input_pp')
+    if os.path.isdir(cls.path_pp):
+        pass
+    else:
+        os.makedirs(cls.path_pp)
     outfile = os.path.join(cls.path_pp, outfilename)
-    print 'output file of pp will be saved as: \n' + outfile + '\n'
+    print infile + '\n'
+    print outfile + '\n'
     
 # =============================================================================
 #   # commands to convert select days and temporal frequency 
