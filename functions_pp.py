@@ -75,7 +75,8 @@ class Variable:
 
         filename = '{}_{}-{}_{}_{}_{}_{}deg'.format(self.name, self.startyear, self.endyear, self.startmonth, self.endmonth, 'daily', self.grid).replace(' ', '_')
         self.filename = filename +'.nc'
-        print("Variable function selected {} \n".format(self.filename))
+        print('\n\t**\n\t{} {}-{} on {} grid\n\t**\n'.format(self.name, self.startyear, self.endyear, self.grid))
+#        print("Variable function selected {} \n".format(self.filename))
 
 def retrieve_ERA_i_field(cls):
     from functions_pp import kornshell_with_input
@@ -83,23 +84,24 @@ def retrieve_ERA_i_field(cls):
     import os
     server = ECMWFDataServer()
     file_path = os.path.join(cls.path_raw, cls.filename)
+    file_path_raw = file_path.replace('daily','oper')
     datestring = "/".join(cls.datelist_str)
-    if cls.stream == "mnth" or cls.stream == "oper":
-        time = "00:00:00/06:00:00/12:00:00/18:00:00"
-    elif cls.stream == "moda":
-        time = "00:00:00"
-    else:
-        print("stream is not available")
+#    if cls.stream == "mnth" or cls.stream == "oper":
+#        time = "00:00:00/06:00:00/12:00:00/18:00:00"
+#    elif cls.stream == "moda":
+#        time = "00:00:00"
+#    else:
+#        print("stream is not available")
 
 
     if os.path.isfile(path=file_path) == True:
-        print("You have already download the variable {} from {} to {} on grid {}d ".format(cls.name, cls.startyear, cls.endyear, cls.grid))
-        print("\n to path: {} \n ".format(file_path))
+        print("You have already download the variable")
+        print("to path: {} \n ".format(file_path))
         pass
     else:
-        print(" You WILL download variable {} \n stream is set to {} \n".format \
+        print("You WILL download variable {} \n stream is set to {} \n".format \
             (cls.name, cls.stream))
-        print("\n to path: \n \n {} \n \n".format(file_path))
+        print("to path: \n \n {} \n \n".format(file_path_raw))
         # !/usr/bin/python
         if cls.levtype == 'sfc':
             server.retrieve({
@@ -115,7 +117,7 @@ def retrieve_ERA_i_field(cls):
                  "time"      :  cls.time_ana,
                 "type"      :   "an",
                 "format"    :   "netcdf",
-                "target"    :   file_path,
+                "target"    :   file_path_raw,
                 })
         elif cls.levtype == 'pl':
             server.retrieve({
@@ -131,10 +133,10 @@ def retrieve_ERA_i_field(cls):
                  "time"      :  cls.time_ana,
                 "type"      :   "an",
                 "format"    :   "netcdf",
-                "target"    :   file_path,
+                "target"    :   file_path_raw,
                 })
         print("convert operational 6hrly data to daily means")
-        args = ['cdo daymean {} {}'.format(file_path.replace('daily','oper'), file_path)]
+        args = ['cdo daymean {} {}'.format(file_path_raw, file_path)]
         kornshell_with_input(args)
     return
         
@@ -162,20 +164,16 @@ def kornshell_with_input(args):
     print out[0].decode()
     return
 
-
-def preprocessing_ncdf(cls, exp):
+def datestr_for_preproc(cls, exp):
     ''' 
-    This function does some python manipulation based on your experiment 
-    to create the corresponding cdo commands. 
-    A kornshell script is created in the folder bash_scripts. First time you
-    run it, it will give execution rights error. Open terminal -> go to 
-    bash_scrips folder -> type 'chmod 755 bash_script.sh' to give exec rights.
-    - Select time period of interest from daily mean time series
-    - Do timesel mean based on your exp['tfreq']
-    - Make sure the calenders are the same, dates are used to select data by xarray
-    - Gridpoint detrending
-    - Calculate anomalies (w.r.t. multi year daily means)
-    - deletes time bonds from the variables
+    The cdo timselmean that is used in the preprocessing_ncdf() will keep calculating 
+    a mean over 10 days and does not care about the date of the years (also logical). 
+    This means that after 36 timesteps you have averaged 360 days into steps of 10. 
+    The last 5/6 days of the year do not fit the 10 day mean. It will just continuing 
+    doing timselmean operations, meaning that the second year the first timestep will 
+    be e.g. the first of januari (instead of the fifth of the first year). To ensure 
+    the months and days in each year correspond, we need to adjust the dates that were 
+    given by exp['sstartdate'] - exp['senddate'].
     '''
     import os
     from netCDF4 import Dataset
@@ -183,10 +181,6 @@ def preprocessing_ncdf(cls, exp):
     import pandas as pd
     import numpy as np
     import calendar
-    # Final input and output files
-    infile = os.path.join(cls.path_raw, cls.filename)
-    # convert to inter annual daily mean to make this faster
-    tmpfile = os.path.join(cls.path_raw, 'tmpfiles', 'tmp.nc')
     # check temporal frequency raw data
     file_path = os.path.join(cls.path_raw, cls.filename)
     ncdf = Dataset(file_path)
@@ -195,7 +189,7 @@ def preprocessing_ncdf(cls, exp):
 # =============================================================================
 #     select dates
 # =============================================================================
-    # this is your study period
+    # selday_pp is your study period
     seldays_pp = pd.DatetimeIndex(start=exp['sstartdate'], end=exp['senddate'], 
                                 freq=(dates[1] - dates[0]))
     end_day = seldays_pp.max() 
@@ -203,7 +197,6 @@ def preprocessing_ncdf(cls, exp):
     # consists of the same day. For this to be true, you need to make sure that
     # the selday_pp period exactly fits in a integer multiple of 'tfreq'
     temporal_freq = np.timedelta64(exp['tfreq'], 'D') 
-    timesteps = int(np.timedelta64(exp['tfreq'], 'D')  / (dates[1] - dates[0]))
     fit_steps_yr = (end_day - seldays_pp.min())  / temporal_freq
     # The +1 = include day 1 in tfreq mean
     start_day = (seldays_pp.max() - (temporal_freq * np.round(fit_steps_yr, decimals=0))) + 1 
@@ -229,11 +222,42 @@ def preprocessing_ncdf(cls, exp):
     outfilename = outfilename.replace('daily', 'dt-{}days'.format(exp['tfreq']))
     outfilename = outfilename.replace('_{}_'.format(1),'_{}{}_'.format(start_day.day, start_day.month_name()[:3]))
     outfilename = outfilename.replace('_{}_'.format(12),'_{}{}_'.format(end_day.day, end_day.month_name()[:3]))
-    cls.path_pp = os.path.join(exp['path_exp_pp'], 'input_pp')
-    if os.path.isdir(cls.path_pp) == False: os.makedirs(cls.path_pp)
-    outfile = os.path.join(cls.path_pp, outfilename)
+    cls.filename_pp = outfilename
+    cls.path_pp = exp['path_pp']
+    outfile = os.path.join(exp['path_pp'], outfilename)
     print 'output file of pp will be saved as: \n' + outfile + '\n'
-    
+    return outfile, datesstr, cls
+
+def preprocessing_ncdf(outfile, datesstr, cls, exp):
+    ''' 
+    This function does some python manipulation based on your experiment 
+    to create the corresponding cdo commands. 
+    A kornshell script is created in the folder bash_scripts. First time you
+    run it, it will give execution rights error. Open terminal -> go to 
+    bash_scrips folder -> type 'chmod 755 bash_script.sh' to give exec rights.
+    - Select time period of interest from daily mean time series
+    - Do timesel mean based on your exp['tfreq']
+    - Make sure the calenders are the same, dates are used to select data by xarray
+    - Gridpoint detrending
+    - Calculate anomalies (w.r.t. multi year daily means)
+    - deletes time bonds from the variables
+    '''
+    import os
+    from netCDF4 import Dataset
+    from netCDF4 import num2date
+    import pandas as pd
+    import numpy as np
+    # Final input and output files
+    infile = os.path.join(cls.path_raw, cls.filename)
+    # convert to inter annual daily mean to make this faster
+    tmpfile = os.path.join(cls.path_raw, 'tmpfiles', 'tmp.nc')
+    # check temporal frequency raw data
+    file_path = os.path.join(cls.path_raw, cls.filename)
+    ncdf = Dataset(file_path)
+    numtime = ncdf.variables['time']
+    dates = pd.to_datetime(num2date(numtime[:], units=numtime.units, calendar=numtime.calendar))
+    timesteps = int(np.timedelta64(exp['tfreq'], 'D')  / (dates[1] - dates[0]))
+    temporal_freq = np.timedelta64(exp['tfreq'], 'D') 
 # =============================================================================
 #   # commands to convert select days and temporal frequency 
 # =============================================================================
@@ -278,7 +302,6 @@ def preprocessing_ncdf(cls, exp):
 # =============================================================================
 #     # update class
 # =============================================================================
-    cls.filename_pp = outfilename
     file_path = os.path.join(cls.path_pp, cls.filename_pp)
     ncdf = Dataset(file_path)
     numtime = ncdf.variables['time']
@@ -302,7 +325,7 @@ def import_array(cls, path='pp'):
     numtime = marray['time']
     dates = num2date(numtime, units=numtime.units, calendar=numtime.attrs['calendar'])
     dates_np = pd.to_datetime(dates)
-    print('temporal frequency \'dt\' is: \n{}'.format(dates_np[1]- dates_np[0]))
+#    print('temporal frequency \'dt\' is: \n{}'.format(dates_np[1]- dates_np[0]))
     marray['time'] = dates_np
     cls.dates_np = dates_np
     return marray, cls

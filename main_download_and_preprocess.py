@@ -30,7 +30,9 @@ import_array = functions_pp.import_array
 # which will be made when running the code
 base_path = "/Users/semvijverberg/surfdrive/Data_ERAint/"
 path_raw = os.path.join(base_path, 'input_raw')
+path_pp  = os.path.join(base_path, 'input_pp')
 if os.path.isdir(path_raw) == False : os.makedirs(path_raw) 
+if os.path.isdir(path_pp) == False: os.makedirs(path_pp)
 # *****************************************************************************
 # Step 1 Download netcdf
 # *****************************************************************************
@@ -42,8 +44,12 @@ exp = dict(
      'startyear'    :       1979,
      'endyear'      :       2017,
      #'vars'        :       [['name_RV','name_actor'],['ECMWF_var_codes'],['ECMWF levtypes'], ['vertical levels']]
+#     'vars'         :       [['t2m', 'sst'],['167.128','34.128'],['sfc', 'sfc'],[0, 0]],
+#     'vars'         :       [['t2m', 'u'],['167.128', '131.128'],['sfc', 'pl'],[0, '500']],
      'vars'         :       [['t2m', 'sst', 'u'],['167.128', '34.128', '131.128'],['sfc', 'sfc', 'pl'],[0, 0, '500']],
-     'base_path'    :       base_path}
+#     'vars'         :       [['t2m', 'sst', 'sst'],['167.128', '34.128', '34.128'],['sfc', 'sfc', 'sfc'],[0, 0, 0]],
+     'base_path'    :       base_path,
+      'path_pp'     :       path_pp},
      )
 # Information needed to pre-process, select temporal frequency of data (must 
 # be an even number, otherwise you will split one day in half when taking 
@@ -54,8 +60,9 @@ exp['sstartdate'] = '{}-5-1 09:00:00'.format(exp['startyear'])
 exp['senddate']   = '{}-8-31 09:00:00'.format(exp['startyear'])
 exp['exp_pp'] = '{}_m{}-{}_dt{}'.format("_".join(exp['vars'][0]), 
                 exp['sstartdate'].split('-')[1], exp['senddate'].split('-')[1], exp['tfreq'])
-exp['path_exp_pp'] = os.path.join(base_path, exp['exp_pp'])
-if os.path.isdir(exp['path_exp_pp']) == False : os.makedirs(exp['path_exp_pp'])
+exp['path_exp'] = os.path.join(base_path, exp['exp_pp'])
+if os.path.isdir(exp['path_exp']) == False : os.makedirs(exp['path_exp'])
+exp['mask'] = 'ward'
 #%%
 # assign instance
 for idx in range(len(exp['vars'][0]))[:]:
@@ -82,7 +89,13 @@ for idx in range(len(exp['vars'][0]))[:]:
     # First time: Read Docstring by typing 'functions_pp.preprocessing_ncdf?' in console
     # Solve permission error by giving bash script execution right, read Docstring
     # Strongly recommended, see the function description to read what it does.
-    functions_pp.preprocessing_ncdf(var_class, exp)
+    outfile, datesstr, var_class = functions_pp.datestr_for_preproc(var_class, exp)
+    if os.path.isfile(outfile) == True: 
+        print('looks like you already have done the pre-processing,\n'
+              'to save time let\'s not do it twice..')
+        pass
+    else:    
+        functions_pp.preprocessing_ncdf(outfile, datesstr, var_class, exp)
     
 # *****************************************************************************
 # Step 3 Select Response Variable period (which period of the year you want to predict)
@@ -100,23 +113,28 @@ RV_period = [x for sublist in RV_period for x in sublist]
 RV_period.sort()
 exp['RV_period'] = RV_period
 exp['RV_oneyr'] = RV.dates_np[RV_period].where(RV.dates_np[RV_period].year == RV.startyear+1).dropna()
+RV_name_range = '{}{}-{}{}_'.format(exp['RV_oneyr'].min().day, exp['RV_oneyr'].min().month_name()[:3], 
+                 exp['RV_oneyr'].max().day, exp['RV_oneyr'].max().month_name()[:3] )
 # *****************************************************************************
 # Step 4 Select spatial mask for the Response Variable (e.g. a SREX region)
 # *****************************************************************************
-exp_mask_region = '13Jul-24Aug_ward' # create this subfolder in 
-exp['path_exp_mask_region'] = os.path.join('/Users/semvijverberg/surfdrive/Data_ERAint/t2m_sst_m5-8_dt14/', exp_mask_region)
+exp_mask_region = '13Jul-24Aug_' + exp['mask'] # create this subfolder in 
+exp['path_exp_mask_region'] = os.path.join(exp['path_exp'], exp_mask_region)
+if os.path.isdir(exp['path_exp_mask_region']) != True : os.makedirs(exp['path_exp_mask_region'])
 cluster = 0
 exp['clus_anom_std'] = 1
 clusters = np.squeeze(xr.Dataset.from_dict(np.load(os.path.join(exp['path_exp_mask_region'], 'clusters_dic.npy')).item()).to_array())
 cluster_out = clusters.sel(cluster=cluster)
 exp['RV_masked'] = np.ma.masked_where((cluster_out < exp['clus_anom_std']*cluster_out.std()), cluster_out).mask
+filename_exp_design1 = os.path.join(exp['path_exp_mask_region'], 'input_tig_dic_part_1.npy')
+np.save(filename_exp_design1, exp)
 #%% 
 # *****************************************************************************
 # *****************************************************************************
 # Part 2 Configure RGCPD/Tigramite settings
 # *****************************************************************************
 # *****************************************************************************
-
+exp = np.load(filename_exp_design1).item()
 exp['alpha'] = 0.01 # set significnace level for correlation maps
 exp['alpha_fdr'] = 2*exp['alpha'] # conservative significance level
 exp['FDR_control'] = False # Do you want to use the conservative alpha_fdr or normal alpha?
@@ -138,27 +156,39 @@ exp['pcA_sets'] = dict({   # dict of sets of pc_alpha values
       'pcA_set4'  : [ 0.5, 0.4, 0.3, 0.2, 0.1], # set4
       'pcA_none'  : None # default
       })
-exp['pcA_set'] = ['pcA_set1a'] 
-exp['map_proj'] = ccrs.LambertCylindrical(central_longitude=int(cluster_out.longitude.mean()))
+exp['pcA_set'] = 'pcA_set1a' 
+# Some output settings
+exp['file_type1'] = ".pdf"
+exp['file_type2'] = ".png"
+exp['SaveTF'] = True
+exp['plotin1fig'] = True
+exp['showplot'] = True
+central_lon_plots = int(cluster_out.longitude.mean())
+map_proj = ccrs.LambertCylindrical(central_longitude=central_lon_plots)
+
 exp['path_output'] = os.path.join(exp['path_exp_mask_region'], 'output_tigr_SST_T2m/')
+exp['fig_path'] = os.path.join(exp['path_output'], 'lag{}to{}/'.format(exp['lag_min'],exp['lag_max']))
+exp['params_combination'] = 'aCorr{}'.format(exp['alpha'])
+if os.path.isdir(exp['fig_path']) != True : os.makedirs(exp['fig_path'])
+exp['fig_subpath'] = os.path.join(exp['fig_path'], '{}_{}_SIGN{}_subinfo/'.format(exp['params_combination'],
+                                       exp['pcA_set'], exp['alpha_level_tig']))
+if os.path.isdir(exp['fig_subpath']) != True : os.makedirs(exp['fig_subpath'])                                  
 # =============================================================================
 # Save Experiment design
 # =============================================================================
-filename_exp_design = os.path.join(exp['path_exp_mask_region'], 'input_tig_dic.npy')
-np.save(filename_exp_design, exp)
+filename_exp_design2 = os.path.join(exp['fig_subpath'], 'input_tig_dic_part_2.npy')
+np.save(filename_exp_design2, exp)
 #%%
 # *****************************************************************************
 # *****************************************************************************
 # Part 3 Start your experiment by running RGCPD python script with settings
 # *****************************************************************************
 # *****************************************************************************
-# The RGCPD scripts runs with input filename_exp_design 
-import subprocess
-script_path = os.path.join(script_dir, 'main_RGCPD_tig3.py')
-bash_and_args = ['python', script_path]
-p = subprocess.Popen(bash_and_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-out = p.communicate(filename_exp_design)
-print(out[0])
+import main_RGCPD_tig3
+
+exp, RV1D, outdic_actors = main_RGCPD_tig3.calculate_corr_maps(filename_exp_design2, map_proj)
+#%%
+main_RGCPD_tig3.run_PCMCI(exp, RV1D, outdic_actors, map_proj)
 
 #%%
 
@@ -211,3 +241,12 @@ print(out[0])
 #args = [args1]
 #
 #functions_pp.kornshell_with_input(args)
+# =============================================================================
+# How to run python script from python script:
+# =============================================================================
+#import subprocess
+#script_path = os.path.join(script_dir, 'main_RGCPD_tig3.py')
+#bash_and_args = ['python', script_path]
+#p = subprocess.Popen(bash_and_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+#out = p.communicate(filename_exp_design2)
+#print(out[0])
