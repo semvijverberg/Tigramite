@@ -16,65 +16,67 @@ class Variable:
     Monthly mean of analysis timesteps (synoptic monthly means)  :   mnth
     Daily Streams:
     Operational (for surface)   :   oper
-
     """
     ecmwf_website = 'http://apps.ecmwf.int/codes/grib/param-db'
-    def __init__(self, exp, name, var_cf_code, levtype, lvllist, stream):
+    def __init__(self, exp, idx, ECMWFdown):
         import calendar
         import os
         # self is the instance of the employee class
         # below are listed the instance variables
-        self.name = name
-        self.var_cf_code = var_cf_code
-        self.lvllist = lvllist
-        self.levtype = levtype
+        self.name = exp['vars'][0][idx]
         self.startyear = exp['startyear']
         self.endyear = exp['endyear']
         self.startmonth = 1
         self.endmonth = 12
         self.grid = exp['grid_res']
-        self.stream = stream
+        self.stream = 'oper'
         self.dataset = exp['dataset']
         self.base_path = exp['base_path']
-        self.path_raw = os.path.join(self.base_path, 'input_raw')
-        if os.path.isdir(self.path_raw) == False : os.makedirs(self.path_raw) 
-        if stream == 'oper':
+        self.path_raw = exp['path_raw']
+        self.path_pp = exp['path_pp']
+        if ECMWFdown == True:
+            self.var_cf_code = exp['vars'][1][idx]
+            self.lvllist = exp['vars'][2][idx]
+            self.levtype = exp['vars'][3][idx]
+#            if stream == 'oper':
             time_ana = "00:00:00/06:00:00/12:00:00/18:00:00"
-        else:
-            time_ana = "00:00:00"
-        self.time_ana = time_ana 
-        
-        days_in_month = dict( {1:31, 2:28, 3:31, 4:30, 5:31, 6:30, 7:31, 8:31, 9:30, 10:31, 11:30, 12:31} )
-        days_in_month_leap = dict( {1:31, 2:29, 3:31, 4:30, 5:31, 6:30, 7:31, 8:31, 9:30, 10:31, 11:30, 12:31} )
-        start = Variable.datetime(self.startyear, self.startmonth, 1)
-        
-        # creating list of dates that we want to download given the startyear/startmonth to endyear/endmonth
-        datelist_str = [start.strftime('%Y-%m-%d')]
-        if self.stream == 'oper':
-            end = Variable.datetime(self.endyear, self.endmonth, days_in_month[self.endmonth])
-            while start < end:          
-                start += Variable.timedelta(days=1)
-                datelist_str.append(start.strftime('%Y-%m-%d'))
-                if start.month == end.month and start.day == days_in_month[self.endmonth] and start.year != self.endyear:
-                    start = Variable.datetime(start.year+1, self.startmonth, 1)
-                    datelist_str.append(start.strftime('%Y-%m-%d'))  
-        elif self.stream == 'moda' or 'mnth':
-            end = Variable.datetime(self.endyear, self.endmonth, 1)
-            while start < end:          
-                days = days_in_month[start.month] if calendar.isleap(start.year)==False else days_in_month_leap[start.month]
-                start += Variable.timedelta(days=days)
-                datelist_str.append(start.strftime('%Y-%m-%d'))
-                if start.month == end.month and start.year != self.endyear:
-                    start = Variable.datetime(start.year+1, self.startmonth, 1)
-                    datelist_str.append(start.strftime('%Y-%m-%d'))             
-        self.datelist_str = datelist_str
+#            else:
+#                time_ana = "00:00:00"
+            self.time_ana = time_ana 
+            
+            days_in_month = dict( {1:31, 2:28, 3:31, 4:30, 5:31, 6:30, 7:31, 8:31, 9:30, 10:31, 11:30, 12:31} )
+            days_in_month_leap = dict( {1:31, 2:29, 3:31, 4:30, 5:31, 6:30, 7:31, 8:31, 9:30, 10:31, 11:30, 12:31} )
+            start = Variable.datetime(self.startyear, self.startmonth, 1)
+            
+            # creating list of dates that we want to download given the startyear/startmonth to endyear/endmonth
+            datelist_str = [start.strftime('%Y-%m-%d')]
+            if self.stream == 'oper':
+                end = Variable.datetime(self.endyear, self.endmonth, days_in_month[self.endmonth])
+                while start < end:          
+                    start += Variable.timedelta(days=1)
+                    datelist_str.append(start.strftime('%Y-%m-%d'))
+                    if start.month == end.month and start.day == days_in_month[self.endmonth] and start.year != self.endyear:
+                        start = Variable.datetime(start.year+1, self.startmonth, 1)
+                        datelist_str.append(start.strftime('%Y-%m-%d'))  
+            elif self.stream == 'moda' or 'mnth':
+                end = Variable.datetime(self.endyear, self.endmonth, 1)
+                while start < end:          
+                    days = days_in_month[start.month] if calendar.isleap(start.year)==False else days_in_month_leap[start.month]
+                    start += Variable.timedelta(days=days)
+                    datelist_str.append(start.strftime('%Y-%m-%d'))
+                    if start.month == end.month and start.year != self.endyear:
+                        start = Variable.datetime(start.year+1, self.startmonth, 1)
+                        datelist_str.append(start.strftime('%Y-%m-%d'))             
+            self.datelist_str = datelist_str
 
-        # Convert to datetime datelist
-#        self.dates_dt = [Variable.datetime.strptime(date, '%Y-%m-%d').date() for date in datelist_str]
-        self.dates_np = Variable.pd.to_datetime(datelist_str)
-
-        filename = '{}_{}-{}_{}_{}_{}_{}deg'.format(self.name, self.startyear, self.endyear, self.startmonth, self.endmonth, 'daily', self.grid).replace(' ', '_')
-        self.filename = filename +'.nc'
+            # Convert to datetime datelist
+#            self.dates_dt = [Variable.datetime.strptime(date, '%Y-%m-%d').date() for date in datelist_str]
+            self.dates = Variable.pd.to_datetime(datelist_str)
+    
+            filename = '{}_{}-{}_{}_{}_{}_{}deg.nc'.format(self.name, self.startyear, self.endyear, self.startmonth, self.endmonth, 'daily', self.grid).replace(' ', '_')
+        elif ECMWFdown == False:
+            filename = exp['own_nc_names'][idx]
+        self.filename = filename
         print('\n\t**\n\t{} {}-{} on {} grid\n\t**\n'.format(self.name, self.startyear, self.endyear, self.grid))
 #        print("Variable function selected {} \n".format(self.filename))
 
@@ -189,7 +191,7 @@ def datestr_for_preproc(cls, exp):
 # =============================================================================
 #     select dates
 # =============================================================================
-    # selday_pp is your study period
+    # selday_pp is the period you aim to study
     seldays_pp = pd.DatetimeIndex(start=exp['sstartdate'], end=exp['senddate'], 
                                 freq=(dates[1] - dates[0]))
     end_day = seldays_pp.max() 
@@ -198,23 +200,23 @@ def datestr_for_preproc(cls, exp):
     # the selday_pp period exactly fits in a integer multiple of 'tfreq'
     temporal_freq = np.timedelta64(exp['tfreq'], 'D') 
     fit_steps_yr = (end_day - seldays_pp.min())  / temporal_freq
-    # The +1 = include day 1 in tfreq mean
-    start_day = (seldays_pp.max() - (temporal_freq * np.round(fit_steps_yr, decimals=0))) + 1 
+    # line below: The +1 = include day 1 in counting
+    start_day = (end_day - (temporal_freq * np.round(fit_steps_yr, decimals=0))) + 1 
     curr_yr = pd.DatetimeIndex(start=start_day, end=end_day, 
                                 freq=(dates[1] - dates[0]))
+    # create datestring for MARS download request
     datesstr = [str(date).split('.', 1)[0] for date in curr_yr.values]
     nyears = (dates.year[-1] - dates.year[0])+1
     for yr in range(1,nyears):
         if calendar.isleap(yr+dates.year[0]) == True:
             next_yr = curr_yr + pd.Timedelta('{}d'.format(366))
-#            print yr+dates.year[0]
-#            print curr_yr[0]
-#            print next_yr[0]
         elif calendar.isleap(yr+dates.year[0]) == False:
             next_yr = curr_yr + pd.Timedelta('{}d'.format(365))
         curr_yr = next_yr
         nextstr = [str(date).split('.', 1)[0] for date in next_yr.values]
         datesstr = datesstr + nextstr
+    # store the adjusted dates in np.datetime64 format in var_class
+    cls.dates = pd.to_datetime(datesstr)
 # =============================================================================
 #   # give appropriate name to output file    
 # =============================================================================
@@ -241,6 +243,7 @@ def preprocessing_ncdf(outfile, datesstr, cls, exp):
     - Gridpoint detrending
     - Calculate anomalies (w.r.t. multi year daily means)
     - deletes time bonds from the variables
+    - stores new relative time axis converted to numpy.datetime64 format in var_class
     '''
     import os
     from netCDF4 import Dataset
@@ -300,13 +303,13 @@ def preprocessing_ncdf(outfile, datesstr, cls, exp):
             add_path_raw, add_units, detrend, anom, echo_end, echo_test] 
     kornshell_with_input(args)
 # =============================================================================
-#     # update class
+#     # update class (more a check if dates are indeed correct)
 # =============================================================================
     file_path = os.path.join(cls.path_pp, cls.filename_pp)
     ncdf = Dataset(file_path)
     numtime = ncdf.variables['time']
     dates = pd.to_datetime(num2date(numtime[:], units=numtime.units, calendar=numtime.calendar))
-    cls.dates_np = dates
+    cls.dates = dates
     cls.temporal_freq = '{}days'.format(temporal_freq.astype('timedelta64[D]').astype(int))
     return 
     
@@ -315,18 +318,45 @@ def import_array(cls, path='pp'):
     import xarray as xr
     from netCDF4 import num2date
     import pandas as pd
+    import numpy as np
     if path == 'raw':
         file_path = os.path.join(cls.path_raw, cls.filename)
 
     else:
         file_path = os.path.join(cls.path_pp, cls.filename_pp)        
     ncdf = xr.open_dataset(file_path, decode_cf=True, decode_coords=True, decode_times=False)
-    marray = ncdf.to_array(file_path).rename(({file_path: cls.name.replace(' ', '_')}))
+    marray = np.squeeze(ncdf.to_array(file_path).rename(({file_path: cls.name.replace(' ', '_')})))
     numtime = marray['time']
     dates = num2date(numtime, units=numtime.units, calendar=numtime.attrs['calendar'])
-    dates_np = pd.to_datetime(dates)
-#    print('temporal frequency \'dt\' is: \n{}'.format(dates_np[1]- dates_np[0]))
-    marray['time'] = dates_np
-    cls.dates_np = dates_np
+    dates = pd.to_datetime(dates)
+#    print('temporal frequency \'dt\' is: \n{}'.format(dates[1]- dates[0]))
+    marray['time'] = dates
+    cls.dates = dates
     return marray, cls
 
+def find_region(data, region='EU'):
+    if region == 'EU':
+        west_lon = -30; east_lon = 40; south_lat = 35; north_lat = 65
+
+    elif region ==  'U.S.':
+        west_lon = -120; east_lon = -70; south_lat = 20; north_lat = 50
+
+    region_coords = [west_lon, east_lon, south_lat, north_lat]
+    import numpy as np
+    def find_nearest(array, value):
+        idx = (np.abs(array - value)).argmin()
+        return int(idx)
+    if west_lon <0 and east_lon > 0:
+        # left_of_meridional = np.array(data.sel(latitude=slice(north_lat, south_lat), longitude=slice(0, east_lon)))
+        # right_of_meridional = np.array(data.sel(latitude=slice(north_lat, south_lat), longitude=slice(360+west_lon, 360)))
+        # all_values = np.concatenate((np.reshape(left_of_meridional, (np.size(left_of_meridional))), np.reshape(right_of_meridional, np.size(right_of_meridional))))
+        lon_idx = np.concatenate(( np.arange(find_nearest(data['longitude'], 360 + west_lon), len(data['longitude'])),
+                              np.arange(0,find_nearest(data['longitude'], east_lon), 1) ))
+        lat_idx = np.arange(find_nearest(data['latitude'],north_lat),find_nearest(data['latitude'],south_lat),1)
+        all_values = data.sel(latitude=slice(north_lat, south_lat), longitude=(data.longitude > 360 + west_lon) | (data.longitude < east_lon))
+    if west_lon < 0 and east_lon < 0:
+        all_values = data.sel(latitude=slice(north_lat, south_lat), longitude=slice(360+west_lon, 360+east_lon))
+        lon_idx = np.arange(find_nearest(data['longitude'], 360 + west_lon), find_nearest(data['longitude'], 360+east_lon))
+        lat_idx = np.arange(find_nearest(data['latitude'],north_lat),find_nearest(data['latitude'],south_lat),1)
+
+    return all_values, region_coords
