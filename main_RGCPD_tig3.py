@@ -73,7 +73,16 @@ def calculate_corr_maps(filename_exp_design2, map_proj):
         # 3c) Precursor field = sst
         #===========================================
         ncdf = Dataset(os.path.join(actor.path_pp, actor.filename_pp), 'r')
-        array = ncdf.variables[var][:,:,:].squeeze()    
+        try:
+            array = ncdf.variables[var][:,:,:].squeeze()
+        except KeyError:
+            print('Name in ex dictionary does not match ncdf, taking variable from'
+                  'ncdf unequal to dimensions, only works when ncdf contains only 1 variable')
+            allkeysncdf = ncdf.variables.keys()
+            dimensionkeys = ['time', 'lat', 'lon', 'latitude', 'longitude']
+            varnc = [keync for keync in allkeysncdf if keync not in dimensionkeys][0]
+            array = ncdf.variables[varnc][:,:,:].squeeze()
+            
         time , nlats, nlons = array.shape # [months , lat, lon]
         box = [ex['la_min'], ex['la_max'], ex['lo_min'], ex['lo_max']]
         # =============================================================================
