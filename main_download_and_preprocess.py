@@ -58,13 +58,16 @@ if ECMWFdownload == True:
     # See http://apps.ecmwf.int/datasets/. 
     # 'vars'        :       [['t2m', 'sst'],['167.128','34.128'],['sfc', 'sfc'],[0, 0]],
     # 'vars'        :       [['t2m', 'u'],['167.128', '131.128'],['sfc', 'pl'],[0, '500']],
-    # 'vars'        :       [['t2m', 'sst', 'u'],['167.128', '34.128', '131.128'],['sfc', 'sfc', 'pl'],[0, 0, '500']],
-    ex['vars']     =   [
-                        ['t2m', 'u'],              # ['name_RV','name_actor', ...]
-                        ['167.128', '131.128'],    # ECMWF param ids
-                        ['sfc', 'pl'],             # Levtypes
-                        [0, 200],                  # Vertical levels
-                        ]
+#    ex['vars']      =       [['t2m', 'sst', 'u'],['167.128', '34.128', '131.128'],['sfc', 'sfc', 'pl'],[0, 0, '500']]
+    ex['vars']      =       [['t2m', 'sst', 'u', 't100'],
+                            ['167.128', '34.128', '131.128', '130.128'],
+                            ['sfc', 'sfc', 'pl', 'pl'],[0, 0, '500', '100']]
+#    ex['vars']     =   [
+#                        ['t2m', 'u'],              # ['name_RV','name_actor', ...]
+#                        ['167.128', '131.128'],    # ECMWF param ids
+#                        ['sfc', 'pl'],             # Levtypes
+#                        [0, 200],                  # Vertical levels
+#                        ]
 else:
     ex['own_nc_names'] = ['hgt.200mb.daily.1979-2016.del29feb.nc',
                            'prcp_GLB_daily_1979-2016-del29feb.75-88E_18-25N.nc']
@@ -137,8 +140,10 @@ RV_period = [x for sublist in RV_period for x in sublist]
 RV_period.sort()
 ex['RV_period'] = RV_period
 ex['RV_oneyr'] = RV.dates[RV_period].where(RV.dates[RV_period].year == RV.startyear+1).dropna()
-RV_name_range = '{}{}-{}{}_'.format(ex['RV_oneyr'].min().day, ex['RV_oneyr'].min().month_name()[:3], 
-                 ex['RV_oneyr'].max().day, ex['RV_oneyr'].max().month_name()[:3] )
+months = dict( {1:'jan',2:'feb',3:'mar',4:'apr',5:'may',6:'jun',
+                7:'jul',8:'aug',9:'sep',10:'okt',11:'nov',12:'dec' } )
+RV_name_range = '{}{}-{}{}_'.format(ex['RV_oneyr'].min().day, months[ex['RV_oneyr'].min().month], 
+                 ex['RV_oneyr'].max().day, months[ex['RV_oneyr'].max().month] )
 # =============================================================================
 # 3.2 Select spatial mask to create 1D timeseries (e.g. a SREX region)
 # =============================================================================
@@ -165,7 +170,7 @@ RV.RV_ts = RV.RV1D[ex['RV_period']] # extract specific months of MT index
 # Store added information in RV class to the exp dictionary
 ex[ex['vars'][0][0]] = RV
 print('\n\t**\n\tOkay, end of Part 1!\n\t**' )
-filename_exp_design1 = os.path.join(ex['path_exp_mask_region'], 'input_tig_dic_part_1.npy')
+filename_exp_design1 = os.path.join(ex['path_exp_mask_region'], 'input_dic_part_1.npy')
 print('\nNext time, you can choose to start with part 2 by loading in '
       'part 1 settings from dictionary \n{}\n.'.format(filename_exp_design1))
 np.save(filename_exp_design1, ex)
@@ -176,14 +181,14 @@ np.save(filename_exp_design1, ex)
 # *****************************************************************************
 # *****************************************************************************
 ex = np.load(filename_exp_design1).item()
-ex['lag_min'] = 3 # Lag time(s) of interest
+ex['lag_min'] = 1 # Lag time(s) of interest
 ex['lag_max'] = 4 
 ex['alpha'] = 0.01 # set significnace level for correlation maps
 ex['alpha_fdr'] = 2*ex['alpha'] # conservative significance level
 ex['FDR_control'] = False # Do you want to use the conservative alpha_fdr or normal alpha?
 # If your pp data is not a full year, there is Maximum meaningful lag given by: 
 #ex['lag_max'] = dates[dates.year == 1979].size - ex['RV_oneyr'].size
-ex['alpha_level_tig'] = 0.9 # Alpha level for final regression analysis by Tigrimate
+ex['alpha_level_tig'] = 0.2 # Alpha level for final regression analysis by Tigrimate
 ex['pcA_sets'] = dict({   # dict of sets of pc_alpha values
       'pcA_set1a' : [ 0.05], # 0.05 0.01 
       'pcA_set1b' : [ 0.01], # 0.05 0.01 
@@ -210,15 +215,15 @@ map_proj = ccrs.LambertCylindrical(central_longitude=central_lon_plots)
 # output paths
 ex['path_output'] = os.path.join(ex['path_exp_mask_region'], 'output_tigr_SST_T2m/')
 ex['fig_path'] = os.path.join(ex['path_output'], 'lag{}to{}/'.format(ex['lag_min'],ex['lag_max']))
-ex['params_combination'] = 'aCorr{}'.format(ex['alpha'])
+ex['params'] = '{}_ac{}_at{}'.format(ex['pcA_set'], ex['alpha'],
+                                                  ex['alpha_level_tig'])
 if os.path.isdir(ex['fig_path']) != True : os.makedirs(ex['fig_path'])
-ex['fig_subpath'] = os.path.join(ex['fig_path'], '{}_{}_SIGN{}_subinfo/'.format(ex['params_combination'],
-                                       ex['pcA_set'], ex['alpha_level_tig']))
+ex['fig_subpath'] = os.path.join(ex['fig_path'], '{}_subinfo'.format(ex['params']))
 if os.path.isdir(ex['fig_subpath']) != True : os.makedirs(ex['fig_subpath'])                                  
 # =============================================================================
 # Save Experiment design
 # =============================================================================
-filename_exp_design2 = os.path.join(ex['fig_subpath'], 'input_tig_dic_part_2.npy')
+filename_exp_design2 = os.path.join(ex['fig_subpath'], 'input_dic_{}.npy'.format(ex['params']))
 np.save(filename_exp_design2, ex)
 print('\n\t**\n\tOkay, end of Part 2!\n\t**' )
 print('\nNext time, you can choose to redo the experiment by loading in '
@@ -230,12 +235,22 @@ print('\nNext time, you can choose to redo the experiment by loading in '
 # *****************************************************************************
 # *****************************************************************************
 import main_RGCPD_tig3
-
+# =============================================================================
+# Find precursor fields (potential precursors)
+# =============================================================================
 ex, outdic_actors = main_RGCPD_tig3.calculate_corr_maps(filename_exp_design2, map_proj)
-copy_stdout = sys.stdout
-#%%
-ex = main_RGCPD_tig3.run_PCMCI(ex, outdic_actors, map_proj)
 
+#%% 
+# =============================================================================
+# Run tigramite to extract causal precursors
+# =============================================================================
+copy_stdout = sys.stdout
+parents_RV, var_names = main_RGCPD_tig3.run_PCMCI(ex, outdic_actors, map_proj)
+#%%
+# =============================================================================
+# Plot final results
+# =============================================================================
+main_RGCPD_tig3.plottingfunction(ex, parents_RV, var_names, outdic_actors, map_proj)
 #%%
 
 

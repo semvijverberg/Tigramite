@@ -504,25 +504,25 @@ def define_regions_and_rank_new(Corr_Coeff, lat_grid, lon_grid):
 
 	
 
-def calc_actor_ts_and_plot(Corr_GPH, GPH_box_anom, lag_min, lat_grid_gph, lon_grid_gph, var, map_proj):
+def calc_actor_ts_and_plot(Corr_Coeff, actbox, ex, lat_grid, lon_grid, var):
     """
 	Calculates the time-series of the actors based on the correlation coefficients and plots the according regions. 
 	Only caluclates regions with significant correlation coefficients
 	"""
-    if Corr_GPH.ndim == 1:
+    if Corr_Coeff.ndim == 1:
         lag_steps = 1
         n_rows = 1
     else:
-		lag_steps = Corr_GPH.shape[1]
-		n_rows = Corr_GPH.shape[1]
+        lag_steps = Corr_Coeff.shape[1]
+        n_rows = Corr_Coeff.shape[1]
 
 	
-    la_gph = lat_grid_gph.shape[0]
-    lo_gph = lon_grid_gph.shape[0]
-    lons_gph, lats_gph = numpy.meshgrid(lon_grid_gph, lat_grid_gph)
+    la_gph = lat_grid.shape[0]
+    lo_gph = lon_grid.shape[0]
+    lons_gph, lats_gph = numpy.meshgrid(lon_grid, lat_grid)
 
     cos_box_gph = numpy.cos(numpy.deg2rad(lats_gph))
-    cos_box_gph_array = repeat(cos_box_gph[newaxis,:], GPH_box_anom.shape[0], 0)
+    cos_box_gph_array = np.repeat(cos_box_gph[None,:], actbox.shape[0], 0)
     cos_box_gph_array = np.reshape(cos_box_gph_array, (cos_box_gph_array.shape[0], -1))
 
 
@@ -549,16 +549,16 @@ def calc_actor_ts_and_plot(Corr_GPH, GPH_box_anom, lag_min, lat_grid_gph, lon_gr
 	# vmax = 50
     for i in range(lag_steps):
 		
-        if Corr_GPH.ndim ==1:
-			Regions_lag_i = define_regions_and_rank_new(Corr_GPH, lat_grid_gph, lon_grid_gph)
+        if Corr_Coeff.ndim ==1:
+			Regions_lag_i = define_regions_and_rank_new(Corr_Coeff, lat_grid, lon_grid)
 		
         else:
-            Regions_lag_i = define_regions_and_rank_new(Corr_GPH[:,i], lat_grid_gph, lon_grid_gph)
+            Regions_lag_i = define_regions_and_rank_new(Corr_Coeff[:,i], lat_grid, lon_grid)
 		
 		
         if Regions_lag_i.max()> 0:
             n_regions_lag_i = int(Regions_lag_i.max())
-            print(n_regions_lag_i, ' regions detected for lag {}, variable {}'.format(lag_min+i,var))
+            print('{} regions detected for lag {}, variable {}'.format(n_regions_lag_i, ex['lag_min']+i,var))
             x_reg = numpy.max(Regions_lag_i)
 			
 #            levels = numpy.arange(x, x + x_reg +1)+.5
@@ -568,7 +568,7 @@ def calc_actor_ts_and_plot(Corr_GPH, GPH_box_anom, lag_min, lat_grid_gph, lon_gr
 #            A_number_region = numpy.zeros(A_r.shape)
 #            A_number_region[A_r == number_region]=1
             
-#            xr_A_num_reg = xr.DataArray(data=A_r, coords=[lat_grid_gph, lon_grid_gph], dims=('latitude','longitude'))
+#            xr_A_num_reg = xr.DataArray(data=A_r, coords=[lat_grid, lon_grid], dims=('latitude','longitude'))
 #            map_proj = map_proj
 #            plt.figure(figsize=(6, 4))
 #            ax = plt.axes(projection=map_proj)
@@ -579,7 +579,7 @@ def calc_actor_ts_and_plot(Corr_GPH, GPH_box_anom, lag_min, lat_grid_gph, lon_gr
 #            ax.set_title('lag = -' + str(lag), fontsize=12)
             
 #			plt.subplot(lag_steps,1, i+1)
-#			lag = lag_min +i
+#			lag = ex['lag_min'] +i
 #			plt.title('lag = -' + str(lag), fontsize=12)
 			
 #			plot_basemap_options(m)		
@@ -598,51 +598,44 @@ def calc_actor_ts_and_plot(Corr_GPH, GPH_box_anom, lag_min, lat_grid_gph, lon_gr
             x = A_r.max() 
 
 			# this array will be the time series for each region
-            ts_regions_lag_i = np.zeros((GPH_box_anom.shape[0], n_regions_lag_i))
-		
-
-		
+            ts_regions_lag_i = np.zeros((actbox.shape[0], n_regions_lag_i))
+				
             for j in range(n_regions_lag_i):
                 B = np.zeros(Regions_lag_i.shape)
                 B[Regions_lag_i == j+1] = 1	
-                ts_regions_lag_i[:,j] = np.mean(GPH_box_anom[:, B == 1] * cos_box_gph_array[:, B == 1], axis =1)
-
-				
+                ts_regions_lag_i[:,j] = np.mean(actbox[:, B == 1] * cos_box_gph_array[:, B == 1], axis =1)
 
             Actors_ts_GPH[i] = ts_regions_lag_i
 		
         else:
-            print 'no regions detected for lag ', lag_min + i	
+            print 'no regions detected for lag ', ex['lag_min'] + i	
             Actors_ts_GPH[i] = np.array([])
             n_regions_lag_i = 0
 		
         Number_regions_per_lag[i] = n_regions_lag_i
 		
-	# fig_GPH.tight_layout(rect=[0, 0.03, 1, 0.93])
 
-
-	
-	if np.sum(Number_regions_per_lag) ==0:
+    if np.sum(Number_regions_per_lag) ==0:
 		print 'no regions detected at all'
 		Actors_GPH = np.array([])
 	
-	else:
-		print np.sum(Number_regions_per_lag), ' regions detected in total'
+    else:
+        print np.sum(Number_regions_per_lag), ' regions detected in total'
 		
 		# check for whcih lag the first regions are detected
-		d = 0
+        d = 0
 		
-		while (Actors_ts_GPH[d].shape[0]==0) & (d < lag_steps):
-			d = d+1
-			print d
+        while (Actors_ts_GPH[d].shape[0]==0) & (d < lag_steps):
+            d = d+1
+            print d
 		
 		# make one array out of it:
-		Actors_GPH = Actors_ts_GPH[d]
+        Actors_GPH = Actors_ts_GPH[d]
 		
-		for i in range(d+1, len(Actors_ts_GPH)):
-			if Actors_ts_GPH[i].shape[0]>0:		
+        for i in range(d+1, len(Actors_ts_GPH)):
+            if Actors_ts_GPH[i].shape[0]>0:		
 				
-				Actors_GPH = np.concatenate((Actors_GPH, Actors_ts_GPH[i]), axis = 1)		
+                Actors_GPH = np.concatenate((Actors_GPH, Actors_ts_GPH[i]), axis = 1)		
 		
 			# if Actors_ts_GPH[i].shape[0]==0:
 				# print i+1

@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from tigramite import data_processing as pp
 from tigramite.pcmci import PCMCI
 from tigramite.independence_tests import ParCorr, GPDC, CMIknn, CMIsymb
-import RGCPD_functions_version_04_v1 as rgcpd
+import RGCPD_functions_version_04 as rgcpd
 import functions_tig
 import numpy as np
 import pandas as pd
@@ -98,17 +98,16 @@ def calculate_corr_maps(filename_exp_design2, map_proj):
         # Plot    
         # =============================================================================
         if ex['plotin1fig'] == False and ex['showplot'] == True:
-            fig = functions_tig.xarray_plot_region([var], outdic_actors, ex['lag_min'],  ex['lag_max'], 
-                                                   map_proj, ex['tfreq'])
-            fig_filename = '{}_vs_{}_{}'.format(allvar[0], var, ex['params_combination']) + ex['file_type2']
+            functions_tig.xarray_plot_region([var], outdic_actors, ex, map_proj)
+            fig_filename = '{}_corr_{}_vs_{}'.format(ex['params'], allvar[0], var) + ex['file_type2']
             plt.savefig(os.path.join(ex['fig_path'], fig_filename), bbox_inches='tight', dpi=200)
                                            
     
     if ex['plotin1fig'] == True and ex['showplot'] == True:
         variables = outdic_actors.keys()
-        fig = functions_tig.xarray_plot_region(variables, outdic_actors, ex['lag_min'],  ex['lag_max'],
+        functions_tig.xarray_plot_region(variables, outdic_actors, ex['lag_min'],  ex['lag_max'],
                                                map_proj, ex['tfreq'])
-        fig_filename = '{}_vs_{}_{}'.format(allvar[0], var, ex['params_combination']) + ex['file_type2']
+        fig_filename = '{}_corr_all'.format(ex['params'], allvar[0], var) + ex['file_type2']
         plt.savefig(os.path.join(ex['fig_path'], fig_filename), bbox_inches='tight', dpi=200)
 #%%
     return ex, outdic_actors
@@ -125,7 +124,7 @@ def run_PCMCI(ex, outdic_actors, map_proj):
     # save output
     if ex['SaveTF'] == True:
         orig_stdout = sys.stdout
-        sys.stdout = f = open(''.join([ex['fig_subpath'],'old.txt']), 'a') 
+        sys.stdout = f = open(os.path.join(ex['fig_subpath'], 'old.txt'), 'a')
     # alpha level for independence test within the pc procedure (finding parents)
     pc_alpha = ex['pcA_sets'][ex['pcA_set']]
     # alpha level for multiple linear regression model while conditining on parents of
@@ -163,10 +162,10 @@ def run_PCMCI(ex, outdic_actors, map_proj):
     # add the full 1D time series of interest as first entry:
     fulldata = np.column_stack((RV.RV1D, fulldata))
     # save fulldata
-    file_name = 'fulldata_{}'.format(ex['params_combination'])#,'.pdf' ])
+    file_name = 'fulldata_{}'.format(ex['params'])#,'.pdf' ])
     fulldata.dump(os.path.join(ex['fig_subpath'], file_name+'.pkl'))   
 
-    file_name = 'list_actors_{}'.format(ex['params_combination'])
+    file_name = 'list_actors_{}'.format(ex['params'])
     var_names_np = np.asanyarray(var_names)
     var_names_np.dump(os.path.join(ex['fig_subpath'], file_name+'.pkl'))  
     # ======================================================================================================================
@@ -265,16 +264,15 @@ def run_PCMCI(ex, outdic_actors, map_proj):
             # *********************************************************
             # print and save only significant regions
             # *********************************************************
-            according_fullname = '{} {} lag {}'.format(str(according_number), 
-                                  according_varname, lag)   
+            according_fullname = '{}lag_{}_reg{}'.format(according_varname, 
+                                  lag,str(according_number))   
             # !!! Corr_precursor_all !!!
             Corr_precursor = Corr_precursor_ALL[according_var_idx]
             actor = outdic_actors[according_varname]
             rgcpd.print_particular_region(according_number, Corr_precursor[:, :], 
                                           actor, map_proj, according_fullname)
-            fig_file = '{}_{}_{}_sign{}_-{}{}'.format(according_fullname,
-                        ex['params_combination'],ex['pcA_set'],alpha_level,
-                        str(lag),ex['file_type2'])
+            fig_file = '{}{}'.format(according_fullname, ex['file_type2'])
+                        
             plt.savefig(os.path.join(ex['fig_subpath'], fig_file), dpi=250)   
             plt.close()
                
@@ -293,20 +291,25 @@ def run_PCMCI(ex, outdic_actors, map_proj):
     if ex['SaveTF'] == True:
         f.close()    
         # reopen the file to reorder the lines
-        in_file=open(''.join([ex['fig_subpath'],'old.txt']),"rb")     
+        in_file=open(os.path.join(ex['fig_subpath'], 'old.txt'),"rb")     
         contents = in_file.read()
         in_file.close()    
         cont_split = contents.splitlines()
         # save a new file    
-        in_file=open(''.join([ex['fig_subpath'], ex['params_combination'],'pcA',ex['pcA_set'],'_SIGN',str(alpha_level),'.txt']),"wb")
+        in_file=open(os.path.join(ex['fig_subpath'], ex['params']+'.txt'),"wb")
         for i in range(0,len(cont_split)):
             in_file.write(cont_split[i]+'\r\n')
         in_file.close()
         # pass output to original console again
         sys.stdout = orig_stdout
         # delete old file
-        os.remove(''.join([ex['fig_subpath'],'old.txt']))  
+        os.remove(os.path.join(ex['fig_subpath'],'old.txt')) 
+        #%%
+    return parents_RV, var_names
 #%%
+
+def plottingfunction(ex, parents_RV, var_names, outdic_actors, map_proj):
+    #%%
     # =============================================================================
     print('\nPlotting all fields significant at alpha_level_tig, while conditioning on parents'
           'that were found in the PC step')
@@ -314,6 +317,13 @@ def run_PCMCI(ex, outdic_actors, map_proj):
     # i+1 below, assuming parents_RV pythonic counting of idx
     # !!!! Check with Marlene !!!!
     all_reg_tig = [[var_names[i][0],var_names[i][1],l] for i,l in parents_RV]
+    allvar = ex['vars'][0]
+    precursor_fields = allvar[ex['excludeRV']:]
+    Corr_Coeff_list = []
+    for var in precursor_fields:
+        actor = outdic_actors[var]
+        Corr_Coeff_list.append(actor.Corr_Coeff)
+    Corr_precursor_ALL = Corr_Coeff_list
     # shape of Corr_Coeff_all_r_l = [prec_vars, gridpoints, lags]
     Corr_Coeff_all_r_l = np.ma.array(Corr_precursor_ALL)
     lags = range(ex['lag_min'],ex['lag_max']+1)
@@ -350,7 +360,7 @@ def run_PCMCI(ex, outdic_actors, map_proj):
 #                    if regions_i[i] == 10 or regions_i[i] == 44:
 #                        print regions_i[i]
                     if [number_region, var, -lag] in all_reg_tig:
-                        print(number_region, var, -lag)
+#                        print(number_region, var, -lag)
                         
 #                        Corr_Coeff_lag_i = Corr_Coeff_all_r_l[varidx,:,:]
 #                        actor = outdic_actors[var]
@@ -394,8 +404,6 @@ def run_PCMCI(ex, outdic_actors, map_proj):
                     all_regions_corr[varidx,lagidx,i] = number_region
                     all_regions_del[varidx,lagidx,i]  = number_region
                     if [number_region, var, -lag] in all_reg_tig: 
-                        if number_region == 44:
-                            print(number_region, var, -lag)
                         all_regions_tig[varidx,lagidx,i] = number_region
                         all_regions_del[varidx,lagidx,i] = 0
                 skip_inds_prev_lag = regions_i.max()
@@ -406,22 +414,29 @@ def run_PCMCI(ex, outdic_actors, map_proj):
         all_regions_del = all_regions_del.reshape((prec_names.size, len(lags), actor.lat_grid.size, 
                                                    actor.lon_grid.size))
         array = np.concatenate( (all_regions_corr[None,:,:,:,:], all_regions_tig[None,:,:,:,:]), axis=0)
-    #%%
-    
-    
+   
     array = np.ma.masked_equal(array, 0)
     all_regions_del[all_regions_del > 0] = 1
     names_col = ['all regions significant Corr', ' all regions significant Tig']
     lat = actor.lat_grid
     lon = actor.lon_grid
-    cmap = 'tab20c'
+
+    #%%    
         
     def finalfigure(xrdata, all_regions_deladj, file_name):
         g = xr.plot.FacetGrid(xrdata, col='names_col', row='names_row', subplot_kws={'projection': map_proj},
                           aspect= (lon.size) / lat.size, size=3)
+        figwidth = g.fig.get_figwidth() ; figheight = g.fig.get_figheight()
+        if xrdata.max() >= 2: 
+            cmap = plt.cm.Dark2
+            clevels = np.arange(int(xrdata.min()), int(xrdata.max())+1E-9, 1)
+        else:
+            cmap = plt.cm.Greens
+            clevels = [0., 0.95, 1.0]
         
-        clevels = np.arange(int(xrdata.min()), int(xrdata.max())+1)
-    
+        
+#        xrdata.data[xrdata.data > 0.5] = 2.
+#        clevels = np.linspace(int(xrdata.data.min()), int(xrdata.max())+1E-9, 2)
         for row in xrdata.names_row.values:
             rowidx = list(xrdata.names_row.values).index(row)
             plotrow = xrdata.sel(names_row=row)
@@ -430,52 +445,63 @@ def run_PCMCI(ex, outdic_actors, map_proj):
             colidx = 0
             plotdatac = plotrow.sel(names_col=names_col[0])
             im = plotdatac.plot.contourf(ax=g.axes[rowidx,colidx], transform=ccrs.PlateCarree(),
-                                                cmap=cmap, levels=clevels, alpha=.5,
+                                                cmap=cmap, levels=clevels, alpha=1,
                                                 subplot_kws={'projection':map_proj},
                                                 add_colorbar=False)
-            plotdata = plotrow.sel(names_col=names_col[0]) 
-            plotdata.values = all_regions_deladj[rowidx,:,:]
-            plotdata.plot.contour(ax=g.axes[rowidx,colidx], transform=ccrs.PlateCarree(),
-                                                colors=['grey'], 
+            plotdatat = plotrow.sel(names_col=names_col[1])
+            plotdatat.data = np.nan_to_num(plotdatat)
+            plotdatat.plot.contour(ax=g.axes[rowidx,colidx], transform=ccrs.PlateCarree(),
+                                                colors=['black'], linewidth=0.35,
                                                 subplot_kws={'projection':map_proj},
                                                 add_colorbar=False)
             colidx = 1
             plotdatat = plotrow.sel(names_col=names_col[1])
             if np.sum(plotdatat) == 0.0:
-                g.axes[rowidx,colidx].text(0.5, -0.1, 'No regions significant',
+                g.axes[rowidx,colidx].text(0.5, 0.5, 'No regions significant',
                               horizontalalignment='center', fontsize='x-large',
                               verticalalignment='center', transform=g.axes[rowidx,colidx].transAxes)
             else:
                 im = plotdatat.plot.contourf(ax=g.axes[rowidx,colidx], transform=ccrs.PlateCarree(),
-                                                    cmap=cmap, levels=clevels,
+                                                cmap=cmap, levels=clevels,
+                                                subplot_kws={'projection':map_proj},
+                                                add_colorbar=False)
+                plotdatat.data = np.nan_to_num(plotdatat)
+                plotdatat.plot.contour(ax=g.axes[rowidx,colidx], transform=ccrs.PlateCarree(),
+                                                    colors=['black'], linewidth=0.35,
                                                     subplot_kws={'projection':map_proj},
                                                     add_colorbar=False)
-            g.axes[rowidx,0].text(-.05, 0.5, row,
+            
+            g.axes[rowidx,0].text(-figwidth/100, 0.5, row,
                       horizontalalignment='center', fontsize='x-large',
                       verticalalignment='center', transform=g.axes[rowidx,0].transAxes)
         for ax in g.axes.flat:
-            ax.coastlines(color='grey')
+            ax.coastlines(color='grey', alpha=0.3)
             ax.set_title('')
         g.axes[0,1].set_title(names_col[1] + '\nat alpha={} with '
-                      'pc_alpha(s)={}'.format(alpha_level, pc_alpha), fontsize='x-large')
+                      'pc_alpha(s)={}'.format(ex['alpha_level_tig']  , ex['pcA_sets'][ex['pcA_set']]), fontsize='x-large')
         g.axes[0,0].set_title(names_col[0] + '\nat Corr p-value={}'.format(ex['alpha']),
                       fontsize='x-large')
-        g.axes[rowidx,0].text(0.5, -0.075, 'Black contours are not significant after MCI',
-                      horizontalalignment='center', fontsize='x-large',
-                      verticalalignment='center', transform=g.axes[rowidx,0].transAxes)
-        
-        cbar_ax = g.fig.add_axes([0.25, 0.1, 0.5, 0.05])
-        plt.colorbar(im, cax=cbar_ax, orientation='horizontal')
-
+#        g.axes[rowidx,0].text(0.5, figwidth/100, 'Black contours are not significant after MCI',
+#                      horizontalalignment='center', fontsize='x-large',
+#                      verticalalignment='center', transform=g.axes[rowidx,0].transAxes)
+        if ex['plotin1fig'] == False:
+            cbar_ax = g.fig.add_axes([0.25, (figheight/25)/len(g.row_names), 
+                                      0.5, (figheight/150)/len(g.row_names)])
+            plt.colorbar(im, cax=cbar_ax, orientation='horizontal')
+#        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        plt.subplots_adjust(wspace=0.0, hspace=-0.3)
         g.fig.savefig(os.path.join(ex['fig_path'], file_name + ex['file_type2']),dpi=250)
         return
+    
     
     if ex['plotin1fig'] == True:
         names_row = [i +' all lags' for i in prec_names]
         xrdata = xr.DataArray(data=array, coords=[names_col, names_row, lat, lon], 
                             dims=['names_col','names_row','latitude','longitude'], name='Corr Coeff')
+        xrdata.data = np.nan_to_num(xrdata.data)
+        xrdata.data[xrdata.data > 0.5] = 1.
         all_regions_deladj = all_regions_del
-        file_name = 'all_{}_{}_SIGN{}_all'.format(ex['params_combination'], ex['pcA_set'], alpha_level)
+        file_name = '{}_tigout_all'.format(ex['params'])
         finalfigure(xrdata, all_regions_deladj, file_name)
     if ex['plotin1fig'] == False:        
         for var in allvar[ex['excludeRV']:]:       
@@ -483,19 +509,15 @@ def run_PCMCI(ex, outdic_actors, map_proj):
             onevar_array = array[:,varidx,:,:,:].copy()
             names_row = []
             for lag in lags:
-                names_row.append(var + ' -{} days'.format(lag * ex['tfreq']))
+                names_row.append(var + '\n-{} days'.format(lag * ex['tfreq']))
             
             xrdata = xr.DataArray(data=onevar_array, coords=[names_col, names_row, lat, lon], 
-                                dims=['names_col','names_row','latitude','longitude'], name='Corr Coeff')
+                                dims=['names_col','names_row','latitude','longitude'], name='Corr Coeff')           
             
             all_regions_deladj = all_regions_del[varidx]
-            file_name = '{}_{}_{}_SIGN{}_all'.format(var, ex['params_combination'], ex['pcA_set'], alpha_level)
+            file_name = '{}_tigout_{}'.format(ex['params'], var)
             finalfigure(xrdata, all_regions_deladj, file_name)
-    
- 
-
  #%%
-    return ex
+    return
 
-          
-            
+         

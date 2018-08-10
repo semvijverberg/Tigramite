@@ -169,15 +169,13 @@ def save_figure(data, path):
 
 
 
-def xarray_plot_region(print_vars, outd, lag_min, lag_max, map_proj, tfreq):
+def xarray_plot_region(print_vars, outdic_actors, ex, map_proj):
     #%%
-#    (lag_min, lag_max, map_proj) = (exp['lag_min'], exp['lag_max'], map_proj)
     import cartopy.crs as ccrs
     import matplotlib.colors as colors
     import numpy as np
     import xarray as xr
-#    map_proj = ccrs.LambertCylindrical(central_longitude=int(cluster_out.longitude.mean()))
-#    map_proj = ccrs.Orthograsphic(central_longitude=int(cluster_out.longitude.mean()), central_latitude=0)
+    outd = outdic_actors
     list_Corr = []
     list_mask = []
     if print_vars == 'all':
@@ -186,8 +184,8 @@ def xarray_plot_region(print_vars, outd, lag_min, lag_max, map_proj, tfreq):
         variables = print_vars
         
     for var in variables:
-        lags = range(lag_min, lag_max+1)
-        lags = ['{} ({} days)'.format(l, l*tfreq) for l in lags]
+        lags = range(ex['lag_min'], ex['lag_max']+1)
+        lags = ['{} ({} days)'.format(l, l*ex['tfreq']) for l in lags]
         lat = outd[var].lat_grid
         lon = outd[var].lon_grid
         list_Corr.append(outd[var].Corr_Coeff.data[None,:,:].reshape(lat.size,lon.size,len(lags)))
@@ -201,6 +199,7 @@ def xarray_plot_region(print_vars, outd, lag_min, lag_max, map_proj, tfreq):
                         dims=['variable','latitude','longitude','lag'], name='Corr Coeff')
     g = xr.plot.FacetGrid(xrdata, col='variable', row='lag', subplot_kws={'projection': map_proj},
                       aspect= (lon.size) / lat.size, size=3)
+    figheight = g.fig.get_figheight()
     class MidpointNormalize(colors.Normalize):
         def __init__(self, vmin=None, vmax=None, midpoint=None, clip=False):
             self.midpoint = midpoint
@@ -235,8 +234,10 @@ def xarray_plot_region(print_vars, outd, lag_min, lag_max, map_proj, tfreq):
             g.axes[row,col].coastlines()
             
     plt.tight_layout()
-    cbar_ax = g.fig.add_axes([0.25, 0.0, 0.5, 0.05]) #[left, bottom, width, height]
+    g.axes[row,col].get_position()
+    plt.subplots_adjust(wspace=0.0, hspace=0.0)
+    cbar_ax = g.fig.add_axes([0.25, 0.0, 0.5, figheight/300]) #[left, bottom, width, height]
     plt.colorbar(im, cax=cbar_ax , orientation='horizontal', norm=norm, 
                  label='Corr Coefficient', ticks=clevels[::4], extend='neither')
     #%%
-    return g.fig
+    return 

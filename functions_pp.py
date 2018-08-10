@@ -18,26 +18,26 @@ class Variable:
     Operational (for surface)   :   oper
     """
     ecmwf_website = 'http://apps.ecmwf.int/codes/grib/param-db'
-    def __init__(self, exp, idx, ECMWFdown):
+    def __init__(self, ex, idx, ECMWFdown):
         import calendar
         import os
         # self is the instance of the employee class
         # below are listed the instance variables
-        self.name = exp['vars'][0][idx]
-        self.startyear = exp['startyear']
-        self.endyear = exp['endyear']
+        self.name = ex['vars'][0][idx]
+        self.startyear = ex['startyear']
+        self.endyear = ex['endyear']
         self.startmonth = 1
         self.endmonth = 12
-        self.grid = exp['grid_res']
+        self.grid = ex['grid_res']
         self.stream = 'oper'
-        self.dataset = exp['dataset']
-        self.base_path = exp['base_path']
-        self.path_raw = exp['path_raw']
-        self.path_pp = exp['path_pp']
+        self.dataset = ex['dataset']
+        self.base_path = ex['base_path']
+        self.path_raw = ex['path_raw']
+        self.path_pp = ex['path_pp']
         if ECMWFdown == True:
-            self.var_cf_code = exp['vars'][1][idx]
-            self.lvllist = exp['vars'][2][idx]
-            self.levtype = exp['vars'][3][idx]
+            self.var_cf_code = ex['vars'][1][idx]
+            self.levtype = ex['vars'][2][idx]
+            self.lvllist = ex['vars'][3][idx]
 #            if stream == 'oper':
             time_ana = "00:00:00/06:00:00/12:00:00/18:00:00"
 #            else:
@@ -75,7 +75,7 @@ class Variable:
     
             filename = '{}_{}-{}_{}_{}_{}_{}deg.nc'.format(self.name, self.startyear, self.endyear, self.startmonth, self.endmonth, 'daily', self.grid).replace(' ', '_')
         elif ECMWFdown == False:
-            filename = exp['own_nc_names'][idx]
+            filename = ex['own_nc_names'][idx]
         self.filename = filename
         print('\n\t**\n\t{} {}-{} on {} grid\n\t**\n'.format(self.name, self.startyear, self.endyear, self.grid))
 #        print("Variable function selected {} \n".format(self.filename))
@@ -166,7 +166,7 @@ def kornshell_with_input(args):
     print out[0].decode()
     return
 
-def datestr_for_preproc(cls, exp):
+def datestr_for_preproc(cls, ex):
     ''' 
     The cdo timselmean that is used in the preprocessing_ncdf() will keep calculating 
     a mean over 10 days and does not care about the date of the years (also logical). 
@@ -175,7 +175,7 @@ def datestr_for_preproc(cls, exp):
     doing timselmean operations, meaning that the second year the first timestep will 
     be e.g. the first of januari (instead of the fifth of the first year). To ensure 
     the months and days in each year correspond, we need to adjust the dates that were 
-    given by exp['sstartdate'] - exp['senddate'].
+    given by ex['sstartdate'] - ex['senddate'].
     '''
     import os
     from netCDF4 import Dataset
@@ -192,13 +192,13 @@ def datestr_for_preproc(cls, exp):
 #     select dates
 # =============================================================================
     # selday_pp is the period you aim to study
-    seldays_pp = pd.DatetimeIndex(start=exp['sstartdate'], end=exp['senddate'], 
+    seldays_pp = pd.DatetimeIndex(start=ex['sstartdate'], end=ex['senddate'], 
                                 freq=(dates[1] - dates[0]))
     end_day = seldays_pp.max() 
     # after time averaging over 'tfreq' number of days, you want that each year 
     # consists of the same day. For this to be true, you need to make sure that
     # the selday_pp period exactly fits in a integer multiple of 'tfreq'
-    temporal_freq = np.timedelta64(exp['tfreq'], 'D') 
+    temporal_freq = np.timedelta64(ex['tfreq'], 'D') 
     fit_steps_yr = (end_day - seldays_pp.min())  / temporal_freq
     # line below: The +1 = include day 1 in counting
     start_day = (end_day - (temporal_freq * np.round(fit_steps_yr, decimals=0))) + 1 
@@ -221,16 +221,19 @@ def datestr_for_preproc(cls, exp):
 #   # give appropriate name to output file    
 # =============================================================================
     outfilename = cls.filename[:-3]+'.nc'
-    outfilename = outfilename.replace('daily', 'dt-{}days'.format(exp['tfreq']))
-    outfilename = outfilename.replace('_{}_'.format(1),'_{}{}_'.format(start_day.day, start_day.month_name()[:3]))
-    outfilename = outfilename.replace('_{}_'.format(12),'_{}{}_'.format(end_day.day, end_day.month_name()[:3]))
+    outfilename = outfilename.replace('daily', 'dt-{}days'.format(ex['tfreq']))
+    months = dict( {1:'jan',2:'feb',3:'mar',4:'apr',5:'may',6:'jun',7:'jul',
+                         8:'aug',9:'sep',10:'okt',11:'nov',12:'dec' } )
+    
+    outfilename = outfilename.replace('_{}_'.format(1),'_{}{}_'.format(start_day.day, months[start_day.month]))
+    outfilename = outfilename.replace('_{}_'.format(12),'_{}{}_'.format(end_day.day, months[end_day.month]))
     cls.filename_pp = outfilename
-    cls.path_pp = exp['path_pp']
-    outfile = os.path.join(exp['path_pp'], outfilename)
+    cls.path_pp = ex['path_pp']
+    outfile = os.path.join(ex['path_pp'], outfilename)
     print 'output file of pp will be saved as: \n' + outfile + '\n'
     return outfile, datesstr, cls
 
-def preprocessing_ncdf(outfile, datesstr, cls, exp):
+def preprocessing_ncdf(outfile, datesstr, cls, ex):
     ''' 
     This function does some python manipulation based on your experiment 
     to create the corresponding cdo commands. 
@@ -238,7 +241,7 @@ def preprocessing_ncdf(outfile, datesstr, cls, exp):
     run it, it will give execution rights error. Open terminal -> go to 
     bash_scrips folder -> type 'chmod 755 bash_script.sh' to give exec rights.
     - Select time period of interest from daily mean time series
-    - Do timesel mean based on your exp['tfreq']
+    - Do timesel mean based on your ex['tfreq']
     - Make sure the calenders are the same, dates are used to select data by xarray
     - Gridpoint detrending
     - Calculate anomalies (w.r.t. multi year daily means)
@@ -259,8 +262,8 @@ def preprocessing_ncdf(outfile, datesstr, cls, exp):
     ncdf = Dataset(file_path)
     numtime = ncdf.variables['time']
     dates = pd.to_datetime(num2date(numtime[:], units=numtime.units, calendar=numtime.calendar))
-    timesteps = int(np.timedelta64(exp['tfreq'], 'D')  / (dates[1] - dates[0]))
-    temporal_freq = np.timedelta64(exp['tfreq'], 'D') 
+    timesteps = int(np.timedelta64(ex['tfreq'], 'D')  / (dates[1] - dates[0]))
+    temporal_freq = np.timedelta64(ex['tfreq'], 'D') 
 # =============================================================================
 #   # commands to convert select days and temporal frequency 
 # =============================================================================
@@ -270,7 +273,7 @@ def preprocessing_ncdf(outfile, datesstr, cls, exp):
 # =============================================================================
 #    # problem with remapping, ruins the time coordinates
 # =============================================================================
-#    gridfile = os.path.join(cls.path_raw, 'grids', 'landseamask_{}deg.nc'.format(exp['grid_res']))
+#    gridfile = os.path.join(cls.path_raw, 'grids', 'landseamask_{}deg.nc'.format(ex['grid_res']))
 #    convert_grid = 'ncks -O --map={} {} {}'.format(gridfile, outfile, outfile)
 #    cdo_gridfile = os.path.join(cls.path_raw, 'grids', 'lonlat_{}d_grid.txt'.format(grid_res))
 #    convert_grid = 'cdo remapnn,{} {} {}'.format(cdo_gridfile, outfile, outfile)
@@ -278,7 +281,7 @@ def preprocessing_ncdf(outfile, datesstr, cls, exp):
 #   # other unused cdo commands
 # =============================================================================
 #    del_days = 'cdo delete,month=12,11 -delete,month=10,day=31,30,29,28 -delete,month=2,day=29 {} {}'.format(infile, tmpfile)
-#    selmon = 'cdo -selmon,{}/{} {} {}'.format(exp['sstartmonth'],exp['sendmonth'], outfile, outfile)#.replace('[','').replace(']','').replace(', ',',')
+#    selmon = 'cdo -selmon,{}/{} {} {}'.format(ex['sstartmonth'],ex['sendmonth'], outfile, outfile)#.replace('[','').replace(']','').replace(', ',',')
 #    echo_selmon = 'echo '+selmon
 #    overwrite_taxis =   'cdo settaxis,{},1month {} {}'.format(starttime.strftime('%Y-%m-%d,%H:%M'), tmpfile, tmpfile)
 #    del_leapdays = 'cdo delete,month=2,day=29 {} {}'.format(infile, tmpfile)
