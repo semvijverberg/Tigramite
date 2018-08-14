@@ -29,7 +29,6 @@ class Variable:
         self.startmonth = 1
         self.endmonth = 12
         self.grid = ex['grid_res']
-        self.stream = 'oper'
         self.dataset = ex['dataset']
         self.base_path = ex['base_path']
         self.path_raw = ex['path_raw']
@@ -38,6 +37,7 @@ class Variable:
             self.var_cf_code = ex['vars'][1][idx]
             self.levtype = ex['vars'][2][idx]
             self.lvllist = ex['vars'][3][idx]
+            self.stream = 'oper'
 #            if stream == 'oper':
             time_ana = "00:00:00/06:00:00/12:00:00/18:00:00"
 #            else:
@@ -73,15 +73,23 @@ class Variable:
 #            self.dates_dt = [Variable.datetime.strptime(date, '%Y-%m-%d').date() for date in datelist_str]
             self.dates = Variable.pd.to_datetime(datelist_str)
     
-            filename = '{}_{}-{}_{}_{}_{}_{}deg.nc'.format(self.name, self.startyear, self.endyear, self.startmonth, self.endmonth, 'daily', self.grid).replace(' ', '_')
+            self.filename = '{}_{}-{}_{}_{}_{}_{}deg.nc'.format(self.name, self.startyear, self.endyear, self.startmonth, self.endmonth, 'daily', self.grid).replace(' ', '_')
         elif ECMWFdown == False:
-            filename = ex['own_nc_names'][idx]
-        self.filename = filename
+            if len(ex['own_actor_nc_names'][0]) != 0:
+                self.name = ex['own_actor_nc_names'][idx][0]
+                self.filename = ex['own_actor_nc_names'][idx][1]
+                ex['vars'][0].append(self.name)
+                print 't'
+            if len(ex['own_RV_nc_name'][0]) != 0:
+                self.name = ex['own_RV_nc_name'][0]
+                self.filename = ex['own_RV_nc_name'][1]
+                ex['vars'][0].insert(0, self.name)
+
         print('\n\t**\n\t{} {}-{} on {} grid\n\t**\n'.format(self.name, self.startyear, self.endyear, self.grid))
 #        print("Variable function selected {} \n".format(self.filename))
 
 def retrieve_ERA_i_field(cls):
-    from functions_pp import kornshell_with_input
+#    from functions_pp import kornshell_with_input
     from ecmwfapi import ECMWFDataServer
     import os
     server = ECMWFDataServer()
@@ -356,7 +364,8 @@ def find_region(data, region='EU'):
         lon_idx = np.concatenate(( np.arange(find_nearest(data['longitude'], 360 + west_lon), len(data['longitude'])),
                               np.arange(0,find_nearest(data['longitude'], east_lon), 1) ))
         lat_idx = np.arange(find_nearest(data['latitude'],north_lat),find_nearest(data['latitude'],south_lat),1)
-        all_values = data.sel(latitude=slice(north_lat, south_lat), longitude=(data.longitude > 360 + west_lon) | (data.longitude < east_lon))
+        all_values = data.sel(latitude=slice(north_lat, south_lat), 
+                              longitude=(data.longitude > 360 + west_lon) | (data.longitude < east_lon))
     if west_lon < 0 and east_lon < 0:
         all_values = data.sel(latitude=slice(north_lat, south_lat), longitude=slice(360+west_lon, 360+east_lon))
         lon_idx = np.arange(find_nearest(data['longitude'], 360 + west_lon), find_nearest(data['longitude'], 360+east_lon))

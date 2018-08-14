@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 import xarray as xr
 import cartopy.crs as ccrs
-import pickle
+#import pickle
 retrieve_ERA_i_field = functions_pp.retrieve_ERA_i_field
 import_array = functions_pp.import_array
 #%%
@@ -35,7 +35,7 @@ if os.path.isdir(path_raw) == False : os.makedirs(path_raw)
 if os.path.isdir(path_pp) == False: os.makedirs(path_pp)
 # True if you want to download ncdfs through ECMWF MARS, only analytical fields 
 ECMWFdownload = True
-importRVts = True
+importRVts = False
 
 # *****************************************************************************
 # Step 1 Create dictionary and variable class (and optionally download ncdfs)
@@ -53,14 +53,19 @@ ex = dict(
      'path_raw'     :       path_raw,
      'path_pp'     :       path_pp}
      )
+
+# own ncdfs must have same period, daily data and on same grid
+ex['own_actor_nc_names'] = [[]]
+ex['own_RV_nc_name'] = ['t2mmax', 't2mmax_1979-2017_1_12_daily_2.5deg.nc']
+
 # =============================================================================
 # Info to download ncdf from ECMWF, atm only analytical fields (no forecasts)
 # =============================================================================
 # You need the ecmwf-api-client package for this option.
 if ECMWFdownload == True:
     # See http://apps.ecmwf.int/datasets/. 
-    # 'vars'        :       [['t2m', 'sst'],['167.128','34.128'],['sfc', 'sfc'],[0, 0]],
-     ex['vars']      =       [['t2m', 'u'],['167.128', '131.128'],['sfc', 'pl'],[0, '500']]
+    ex['vars']      =       [['t2m', 'sst'],['167.128','34.128'],['sfc', 'sfc'],[0, 0]]
+#    ex['vars']      =       [['t2m', 'u'],['167.128', '131.128'],['sfc', 'pl'],[0, '500']]
 #    ex['vars']      =       [['t2m', 'sst', 'u'],['167.128', '34.128', '131.128'],['sfc', 'sfc', 'pl'],[0, 0, '500']]
 #    ex['vars']      =       [['t2m', 'sst', 'u', 't100'],
 #                            ['167.128', '34.128', '131.128', '130.128'],
@@ -71,18 +76,29 @@ if ECMWFdownload == True:
 #                        ['sfc', 'pl'],             # Levtypes
 #                        [0, 200],                  # Vertical levels
 #                        ]
-else:
-    ex['own_nc_names'] = ['hgt.200mb.daily.1979-2016.del29feb.nc',
-                           'prcp_GLB_daily_1979-2016-del29feb.75-88E_18-25N.nc']
-    
+
+
+
 # =============================================================================
 # Make a class for each variable, this class contains variable specific information,
 # needed to download and post process the data. Along the way, information is added 
 # to class based on decisions that you make. 
 # =============================================================================
-for idx in range(len(ex['vars'][0]))[:]:
+if ECMWFdownload == True:
+    for idx in range(len(ex['vars'][0]))[:]:
+        # class for ECMWF downloads
+        var_class = functions_pp.Variable(ex, idx, ECMWFdownload) 
+        ex[ex['vars'][0][idx]] = var_class
+if len(ex['own_actor_nc_names'][0]) != 0:
+    print ex['own_actor_nc_names'][0][0]
+    for idx in range(len(ex['own_actor_nc_names'])):
+        ECMWFdownload = False
+        var_class = functions_pp.Variable(ex, idx, ECMWFdownload) 
+        ex[ex['vars'][0][idx]] = var_class
+if len(ex['own_RV_nc_name']) != 0:
+    ECMWFdownload = False
     var_class = functions_pp.Variable(ex, idx, ECMWFdownload) 
-    ex[ex['vars'][0][idx]] = var_class
+    ex[ex['vars'][0][0]] = var_class
 
 # =============================================================================
 # Downloading data from Era-interim?  
@@ -122,7 +138,6 @@ for var in ex['vars'][0]:
         pass
     else:    
         functions_pp.preprocessing_ncdf(outfile, datesstr, var_class, ex)
-
 #%%  
 # *****************************************************************************
 # Step 3 Preprocess Response Variable (RV) 
@@ -131,9 +146,15 @@ for var in ex['vars'][0]:
 # 3.1 Select RV period (which period of the year you want to predict)
 # =============================================================================
 if importRVts == True:
-    xarray = pickle.load( open(os.path.join(ex['path_pp'],"T95ts_1982-2015_m6-8.pkl"), "rb") ) 
-    class RV:
-        dates = xarray.time.values
+    dicRV = np.load( os.path.join(ex['path_pp'],"T95ts_1982-2015_m6-8.pkl") ).item()
+#    dicRV = pickle.load( open(os.path.join(ex['path_pp'],"T95ts_1982-2015_m6-8.pkl"), "rb") ) 
+    class RV_seperateclass:
+        dates = dicRV['dates']
+    RV = RV_seperateclass()
+    RV.startyear = RV.dates.year[0]
+    RV.endyear = RV.dates.year[-1]
+    if RV.startyear != ex['startyear']:
+        print('make sure the dates of the RV match with the actors')
 
 elif importRVts == False:
     # RV should always be the first variable of the vars list in ex
@@ -154,18 +175,19 @@ months = dict( {1:'jan',2:'feb',3:'mar',4:'apr',5:'may',6:'jun',
                 7:'jul',8:'aug',9:'sep',10:'okt',11:'nov',12:'dec' } )
 RV_name_range = '{}{}-{}{}_'.format(ex['RV_oneyr'].min().day, months[ex['RV_oneyr'].min().month], 
                  ex['RV_oneyr'].max().day, months[ex['RV_oneyr'].max().month] )
+
 # =============================================================================
 # 3.2 Select spatial mask to create 1D timeseries (e.g. a SREX region)
 # =============================================================================
 # create this subfolder in ex['path_exp'] for RV_period and spatial mask and
 # ex['path_exp_periodmask'] = os.path.join(ex['path_exp'], exp_folder_periodmask)
 
-exp_folder_periodmask = '13Jul-24Aug_' + ex['mask'] 
+ex['path_exp_periodmask'] = os.path.join(ex['path_exp'], '13Jul-24Aug_' + ex['mask'] )
+if os.path.isdir(ex['path_exp_periodmask']) != True : os.makedirs(ex['path_exp_periodmask'])
 if importRVts == True:
-    RV.RVfullts = xarray.values
+    RV.RVfullts = dicRV['RVfullts']
 elif importRVts == False:
     # save your spatial mask in input_pp (ex['path_pp'])
-    if os.path.isdir(ex['path_exp_periodmask']) != True : os.makedirs(ex['path_exp_periodmask'])
     ex['path_exp_mask_region'] = ex['path_pp']
     # Load in clustering output
     try:
@@ -187,9 +209,9 @@ elif importRVts == False:
     RV_region = np.ma.masked_array(data=clusregarray, 
                                    mask=np.reshape(np.repeat(ex['RV_masked'], ncdfarray.time.size), 
                                    clusregarray.shape))
-    RV.RV1D = np.ma.mean(RV_region, axis = (1,2)) # take spatial mean with mask loaded in beginning
+    RV.RVfullts = np.ma.mean(RV_region, axis = (1,2)) # take spatial mean with mask loaded in beginning
 
-RV.RV_ts = RV.RV1D[ex['RV_period']] # extract specific months of MT index 
+RV.RV_ts = RV.RVfullts[ex['RV_period']] # extract specific months of MT index 
 # Store added information in RV class to the exp dictionary
 ex[ex['vars'][0][0]] = RV
 print('\n\t**\n\tOkay, end of Part 1!\n\t**' )

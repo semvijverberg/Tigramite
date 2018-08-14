@@ -22,10 +22,12 @@ for r in data.values:
     day = int(r[0][7:11])
     string = '{}-{}-{}'.format(year, month, day)
     values.append(float(r[0][10:]))
-
     datelist.append( pd.Timestamp(string) )
 
-RVts = xr.DataArray(values, coords=[pd.to_datetime(datelist)], dims=['time'])
+dates = pd.to_datetime(datelist)
+RVts = xr.DataArray(values, coords=[dates], dims=['time'])
+
+savingdict = dict ( {'RVfullts':RVts, 'dates':dates } )
 
 filepath = '/Users/semvijverberg/surfdrive/Data_ERAint/input_pp'
-pickle.dump( RVts, open(os.path.join(filepath,"T95ts_1982-2015_m6-8.pkl"), "wb") ) 
+pickle.dump( savingdict, open(os.path.join(filepath,"T95ts_1982-2015_m6-8.pkl"), "wb") ) 
