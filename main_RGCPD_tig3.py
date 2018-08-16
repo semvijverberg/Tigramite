@@ -37,8 +37,7 @@ def calculate_corr_maps(filename_exp_design2, map_proj):
     # =============================================================================
     ex = np.load(str(filename_exp_design2)).item()
     # Response Variable is what we want to predict
-    RV_name = ex['vars'][0][0]
-    RV = ex[RV_name]
+    RV = ex[ex['RV_name']]
     ex['time_cycle'] = RV.dates[RV.dates.year == RV.startyear].size # time-cycle of data. total timesteps in one year
     #=====================================================================================
     # Information on period taken for response-variable, already decided in main_download_and_pp
@@ -149,8 +148,8 @@ def run_PCMCI(ex, outdic_actors, map_proj):
  
     
     # load Response Variable class
-    RV_name = ex['vars'][0][0]
-    RV = ex[RV_name]
+    
+    RV = ex[ex['RV_name']]
     # create list with all actors, these will be merged into the fulldata array
     allvar = ex['vars'][0]
     var_names = [[0, allvar[0]]]
@@ -169,7 +168,7 @@ def run_PCMCI(ex, outdic_actors, map_proj):
     fulldata = np.concatenate(tuple(actorlist), axis = 1)
     print('There are {} regions in total'.format(fulldata.shape[1]))
     # add the full 1D time series of interest as first entry:
-    fulldata = np.column_stack((RV.RV1D, fulldata))
+    fulldata = np.column_stack((RV.RVfullts, fulldata))
     # save fulldata
     file_name = 'fulldata_{}'.format(ex['params'])#,'.pdf' ])
     fulldata.dump(os.path.join(ex['fig_subpath'], file_name+'.pkl'))   
@@ -442,6 +441,7 @@ def plottingfunction(ex, parents_RV, var_names, outdic_actors, map_proj):
         else:
             cmap = plt.cm.Greens
             clevels = [0., 0.95, 1.0]
+        levels = [0,.5]
         
         
 #        xrdata.data[xrdata.data > 0.5] = 2.
@@ -461,6 +461,7 @@ def plottingfunction(ex, parents_RV, var_names, outdic_actors, map_proj):
             plotdatat.data = np.nan_to_num(plotdatat)
             plotdatat.plot.contour(ax=g.axes[rowidx,colidx], transform=ccrs.PlateCarree(),
                                                 colors=['black'], linewidth=0.35,
+                                                levels=clevels,
                                                 subplot_kws={'projection':map_proj},
                                                 add_colorbar=False)
             colidx = 1
@@ -498,7 +499,7 @@ def plottingfunction(ex, parents_RV, var_names, outdic_actors, map_proj):
                                       0.5, (figheight/150)/len(g.row_names)])
             plt.colorbar(im, cax=cbar_ax, orientation='horizontal')
 #        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-        plt.subplots_adjust(wspace=0.0, hspace=-0.3)
+        plt.subplots_adjust(wspace=0.1, hspace=-0.3)
         g.fig.savefig(os.path.join(ex['fig_path'], file_name + ex['file_type2']),dpi=250)
         return
     

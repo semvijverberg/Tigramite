@@ -15,16 +15,20 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 import xarray as xr
 import cartopy.crs as ccrs
-#import pickle
+import pickle
 retrieve_ERA_i_field = functions_pp.retrieve_ERA_i_field
 import_array = functions_pp.import_array
 #%%
 # *****************************************************************************
 # *****************************************************************************
-# Part 1 Downloading, preprocessing, choosing general experiment settings
+# Part 1 Downloading (opt), preprocessing(opt), choosing general experiment settings
 # *****************************************************************************
 # *****************************************************************************
-# If you already have your ncdfs skip to step 2 of part 1
+# We will be discriminating between actors and the Response Variable (what you want 
+# to predict). 
+# You can choose to download ncdfs through ECMWF MARS, or you can give your own 
+# ncdfs.
+# It is also possible to insert own 1D time serie for both actors and the RV.
 
 # this will be your basepath, all raw_input and output will stored in subfolder 
 # which will be made when running the code
@@ -33,9 +37,6 @@ path_raw = os.path.join(base_path, 'input_raw')
 path_pp  = os.path.join(base_path, 'input_pp')
 if os.path.isdir(path_raw) == False : os.makedirs(path_raw) 
 if os.path.isdir(path_pp) == False: os.makedirs(path_pp)
-# True if you want to download ncdfs through ECMWF MARS, only analytical fields 
-ECMWFdownload = True
-importRVts = False
 
 # *****************************************************************************
 # Step 1 Create dictionary and variable class (and optionally download ncdfs)
@@ -54,9 +55,30 @@ ex = dict(
      'path_pp'     :       path_pp}
      )
 
+
+# True if you want to download ncdfs through ECMWF MARS, only analytical fields 
+ECMWFdownload = True
+# True if you have your own Response Variable time serie you want to insert
+importRVts = True
+if importRVts == True:
+    RV_name = 'tmax_EUS'
+    RV_actor_names = RV_name + '_' + "_".join(ex['vars'][0])
+    ex['RVts_filename'] = '15Jun-24Aug_compAggljacc'
+    
+else:
+    # if no time series is imported, it will take the first of ex['vars] as the
+    # Response Variable
+    RV_name = ex['vars'][0][0]
+    RV_actor_names = "_".join(ex['vars'][0])
+    # if import RVts == False, then a spatial mask is used to create the required
+    # 1D timeseries.
+    ex['maskname'] = '2.5natearth_with_US_mask'
+    
 # own ncdfs must have same period, daily data and on same grid
 ex['own_actor_nc_names'] = [[]]
-ex['own_RV_nc_name'] = ['t2mmax', 't2mmax_1979-2017_1_12_daily_2.5deg.nc']
+ex['own_RV_nc_name'] = []
+#ex['own_RV_nc_name'] = ['t2mmax', 't2mmax_1979-2017_1_12_daily_2.5deg.nc']
+
 
 # =============================================================================
 # Info to download ncdf from ECMWF, atm only analytical fields (no forecasts)
@@ -76,9 +98,10 @@ if ECMWFdownload == True:
 #                        ['sfc', 'pl'],             # Levtypes
 #                        [0, 200],                  # Vertical levels
 #                        ]
-
-
-
+# =============================================================================
+# Note, ex['vars'] is expanded if you have own ncdfs, the first index will 
+# always be the Response Variable, unless you set importRVts = True
+# =============================================================================
 # =============================================================================
 # Make a class for each variable, this class contains variable specific information,
 # needed to download and post process the data. Along the way, information is added 
@@ -117,11 +140,12 @@ ex['tfreq'] = 14
 # s(elect)startdate and enddate create the period/season you want to investigate:
 ex['sstartdate'] = '{}-6-1 09:00:00'.format(ex['startyear'])
 ex['senddate']   = '{}-8-31 09:00:00'.format(ex['startyear'])
-ex['exp_pp'] = '{}_m{}-{}_dt{}'.format("_".join(ex['vars'][0]), 
-                ex['sstartdate'].split('-')[1], ex['senddate'].split('-')[1], ex['tfreq'])
+
+ex['exp_pp'] = '{}_m{}-{}_dt{}'.format(RV_actor_names, 
+                    ex['sstartdate'].split('-')[1], ex['senddate'].split('-')[1], ex['tfreq'])
+
 ex['path_exp'] = os.path.join(base_path, ex['exp_pp'])
 if os.path.isdir(ex['path_exp']) == False : os.makedirs(ex['path_exp'])
-ex['mask'] = 'ward'
 
 # =============================================================================
 # Preprocess data (this function uses cdo/nco and requires execution rights of
@@ -146,10 +170,12 @@ for var in ex['vars'][0]:
 # 3.1 Select RV period (which period of the year you want to predict)
 # =============================================================================
 if importRVts == True:
-    dicRV = np.load( os.path.join(ex['path_pp'],"T95ts_1982-2015_m6-8.pkl") ).item()
-#    dicRV = pickle.load( open(os.path.join(ex['path_pp'],"T95ts_1982-2015_m6-8.pkl"), "rb") ) 
+    RV_name = 'RV_imp'
+    dicRV = pickle.load( open(os.path.join(ex['path_pp'],ex['RVts_filename']+'.pkl'), "rb") ) 
+    
     class RV_seperateclass:
-        dates = dicRV['dates']
+        RVfullts = dicRV['RVfullts']
+        dates = pd.to_datetime(dicRV['RVfullts'].time.values)
     RV = RV_seperateclass()
     RV.startyear = RV.dates.year[0]
     RV.endyear = RV.dates.year[-1]
@@ -157,12 +183,13 @@ if importRVts == True:
         print('make sure the dates of the RV match with the actors')
 
 elif importRVts == False:
+    RV_name = ex['vars'][0][0]
     # RV should always be the first variable of the vars list in ex
-    RV = ex[ex['vars'][0][0]]
-    ncdfarray, RV = functions_pp.import_array(RV)
+    RV = ex[RV_name]
+    RVarray, RV = functions_pp.import_array(RV)
     
 one_year = RV.dates.where(RV.dates.year == RV.startyear+1).dropna()
-months = [7,8] # Selecting the timesteps of 14 day mean ts that fall in juli and august
+months = [6,7,8] # Selecting the timesteps of 14 day mean ts that fall in juli and august
 RV_period = []
 for mon in months:
     # append the indices of each year corresponding to your RV period
@@ -182,42 +209,45 @@ RV_name_range = '{}{}-{}{}_'.format(ex['RV_oneyr'].min().day, months[ex['RV_oney
 # create this subfolder in ex['path_exp'] for RV_period and spatial mask and
 # ex['path_exp_periodmask'] = os.path.join(ex['path_exp'], exp_folder_periodmask)
 
-ex['path_exp_periodmask'] = os.path.join(ex['path_exp'], '13Jul-24Aug_' + ex['mask'] )
-if os.path.isdir(ex['path_exp_periodmask']) != True : os.makedirs(ex['path_exp_periodmask'])
+
 if importRVts == True:
-    RV.RVfullts = dicRV['RVfullts']
+    i = len(RV_name_range)
+    ex['path_exp_periodmask'] = os.path.join(ex['path_exp'], RV_name_range + 
+                                  ex['RVts_filename'][i:] )
 elif importRVts == False:
-    # save your spatial mask in input_pp (ex['path_pp'])
-    ex['path_exp_mask_region'] = ex['path_pp']
-    # Load in clustering output
+    ex['path_exp_periodmask'] = os.path.join(ex['path_exp'], RV_name_range + ex['maskname'] )
+    # If you don't have your own timeseries yet, then we assume you want to make
+    # one using the first variable listed in ex['vars']. You can 
+    # load a spatial mask here and use it to create your
+    # full timeseries (of length equal to actor time series)  
+    path_masks = os.path.join(ex['path_raw'], 'grids', ex['maskname']+'.npy')                                                 
     try:
-        clusters = np.squeeze(xr.Dataset.from_dict(np.load(os.path.join(ex['path_exp_mask_region'], 'clusters_dic.npy')).item()).to_array())
+        lsm_coun_mask = np.load(path_masks).item()
+        US_mask = lsm_coun_mask['US_mask']
+        nor_lon = US_mask.longitude
+        US_mask = US_mask.roll(longitude=2)
+        US_mask['longitude'] = nor_lon
+        plotting.xarray_plot(US_mask)
     except IOError, e:
-        print('\n**\nSpatial mask not found.\n'
+        print('\n\n**\nSpatial mask not found.\n'
               'Place your spatial mask in folder: \n{}\n'
-              'and rerun this section.\n**'.format(ex['path_exp_mask_region']))
+              'and rerun this section.\n**'.format(ex['path_pp'], 'grids'))
         raise(e)
-        
-    # some settings
-    cluster = 0
-    ex['clus_anom_std'] = 1
-    # Retrieve mask
-    cluster_out = clusters.sel(cluster=cluster)
-    ex['RV_masked'] = np.ma.masked_where((cluster_out < ex['clus_anom_std']*cluster_out.std()), cluster_out).mask
-    # retrieve region used for clustering from ncdfarray
-    clusregarray, region_coords = functions_pp.find_region(ncdfarray, region='U.S.')
-    RV_region = np.ma.masked_array(data=clusregarray, 
-                                   mask=np.reshape(np.repeat(ex['RV_masked'], ncdfarray.time.size), 
-                                   clusregarray.shape))
-    RV.RVfullts = np.ma.mean(RV_region, axis = (1,2)) # take spatial mean with mask loaded in beginning
+    RVarray.coords['mask'] = (('latitude','longitude'), US_mask.mask)
+    RV.RVfullts = RVarray.where(RVarray.mask==False).mean(dim=['latitude','longitude']).squeeze()
 
 RV.RV_ts = RV.RVfullts[ex['RV_period']] # extract specific months of MT index 
 # Store added information in RV class to the exp dictionary
-ex[ex['vars'][0][0]] = RV
-print('\n\t**\n\tOkay, end of Part 1!\n\t**' )
+ex['RV_name'] = RV_name
+ex[RV_name] = RV
+
+
+if os.path.isdir(ex['path_exp_periodmask']) != True : os.makedirs(ex['path_exp_periodmask'])
 filename_exp_design1 = os.path.join(ex['path_exp_periodmask'], 'input_dic_part_1.npy')
+
+print('\n\t**\n\tOkay, end of Part 1!\n\t**' )
 print('\nNext time, you can choose to start with part 2 by loading in '
-      'part 1 settings from dictionary \n{}\n.'.format(filename_exp_design1))
+      'part 1 settings from dictionary \'filename_exp_design1\'\n')
 np.save(filename_exp_design1, ex)
 #%% 
 # *****************************************************************************
@@ -255,10 +285,10 @@ ex['excludeRV'] = 0 # if 0, then RV is also considered as possible actor (autoco
 ex['SaveTF'] = True # if false, output will be printed in console
 ex['plotin1fig'] = False 
 ex['showplot'] = True
-central_lon_plots = int(cluster_out.longitude.mean())
+central_lon_plots = 240
 map_proj = ccrs.LambertCylindrical(central_longitude=central_lon_plots)
 # output paths
-ex['path_output'] = os.path.join(ex['path_exp_periodmask'], 'output_tigr_SST_T2m/')
+ex['path_output'] = os.path.join(ex['path_exp_periodmask'])
 ex['fig_path'] = os.path.join(ex['path_output'], 'lag{}to{}/'.format(ex['lag_min'],ex['lag_max']))
 ex['params'] = '{}_ac{}_at{}'.format(ex['pcA_set'], ex['alpha'],
                                                   ex['alpha_level_tig'])
@@ -271,8 +301,8 @@ if os.path.isdir(ex['fig_subpath']) != True : os.makedirs(ex['fig_subpath'])
 filename_exp_design2 = os.path.join(ex['fig_subpath'], 'input_dic_{}.npy'.format(ex['params']))
 np.save(filename_exp_design2, ex)
 print('\n\t**\n\tOkay, end of Part 2!\n\t**' )
-print('\nNext time, you\'re able to redo the experiment by loading in '
-      'part 2 settings from dictionary \n{}.\n'.format(filename_exp_design2))
+print('\nNext time, you\'re able to redo the experiment by loading in the dict '
+      '\'filename_exp_design2\'.\n')
 #%%
 # *****************************************************************************
 # *****************************************************************************

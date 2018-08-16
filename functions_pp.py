@@ -80,7 +80,7 @@ class Variable:
                 self.filename = ex['own_actor_nc_names'][idx][1]
                 ex['vars'][0].append(self.name)
                 print 't'
-            if len(ex['own_RV_nc_name'][0]) != 0:
+            if len(ex['own_RV_nc_name']) != 0:
                 self.name = ex['own_RV_nc_name'][0]
                 self.filename = ex['own_RV_nc_name'][1]
                 ex['vars'][0].insert(0, self.name)
