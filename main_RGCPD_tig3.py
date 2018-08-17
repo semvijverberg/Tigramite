@@ -105,10 +105,12 @@ def calculate_corr_maps(filename_exp_design2, map_proj):
         # =============================================================================
         # Plot    
         # =============================================================================
-        if ex['plotin1fig'] == False and ex['showplot'] == True:
+        if ex['plotin1fig'] == False:
             functions_tig.xarray_plot_region([var], outdic_actors, ex, map_proj)
             fig_filename = '{}_corr_{}_vs_{}'.format(ex['params'], allvar[0], var) + ex['file_type2']
             plt.savefig(os.path.join(ex['fig_path'], fig_filename), bbox_inches='tight', dpi=200)
+            if ex['showplot'] == False:
+                plt.close()
                                            
     
     if ex['plotin1fig'] == True and ex['showplot'] == True:
@@ -117,6 +119,8 @@ def calculate_corr_maps(filename_exp_design2, map_proj):
                                                map_proj, ex['tfreq'])
         fig_filename = '{}_corr_all'.format(ex['params'], allvar[0], var) + ex['file_type2']
         plt.savefig(os.path.join(ex['fig_path'], fig_filename), bbox_inches='tight', dpi=200)
+        if ex['showplot'] == False:
+            plt.close()
 #%%
     return ex, outdic_actors
 
@@ -441,7 +445,7 @@ def plottingfunction(ex, parents_RV, var_names, outdic_actors, map_proj):
         else:
             cmap = plt.cm.Greens
             clevels = [0., 0.95, 1.0]
-        levels = [0,.5]
+        levels = [0,.5,2.]
         
         
 #        xrdata.data[xrdata.data > 0.5] = 2.
@@ -449,37 +453,27 @@ def plottingfunction(ex, parents_RV, var_names, outdic_actors, map_proj):
         for row in xrdata.names_row.values:
             rowidx = list(xrdata.names_row.values).index(row)
             plotrow = xrdata.sel(names_row=row)
-    #        for col in xrdata.names_col.values:
-    #            colidx = list(xrdata.names_col.values).index(col)
-            colidx = 0
-            plotdatac = plotrow.sel(names_col=names_col[0])
-            im = plotdatac.plot.contourf(ax=g.axes[rowidx,colidx], transform=ccrs.PlateCarree(),
-                                                cmap=cmap, levels=clevels, alpha=1,
-                                                subplot_kws={'projection':map_proj},
-                                                add_colorbar=False)
-            plotdatat = plotrow.sel(names_col=names_col[1])
-            plotdatat.data = np.nan_to_num(plotdatat)
-            plotdatat.plot.contour(ax=g.axes[rowidx,colidx], transform=ccrs.PlateCarree(),
-                                                colors=['black'], linewidth=0.35,
-                                                levels=clevels,
-                                                subplot_kws={'projection':map_proj},
-                                                add_colorbar=False)
-            colidx = 1
-            plotdatat = plotrow.sel(names_col=names_col[1])
-            if np.sum(plotdatat) == 0.0:
-                g.axes[rowidx,colidx].text(0.5, 0.5, 'No regions significant',
-                              horizontalalignment='center', fontsize='x-large',
-                              verticalalignment='center', transform=g.axes[rowidx,colidx].transAxes)
-            else:
-                im = plotdatat.plot.contourf(ax=g.axes[rowidx,colidx], transform=ccrs.PlateCarree(),
-                                                cmap=cmap, levels=clevels,
-                                                subplot_kws={'projection':map_proj},
-                                                add_colorbar=False)
-                plotdatat.data = np.nan_to_num(plotdatat)
-                plotdatat.plot.contour(ax=g.axes[rowidx,colidx], transform=ccrs.PlateCarree(),
-                                                    colors=['black'], linewidth=0.35,
+            for col in xrdata.names_col.values:
+                colidx = list(xrdata.names_col.values).index(col)
+            
+                plotdata = plotrow.sel(names_col=names_col[colidx])
+                if np.sum(plotdata) == 0.:
+                    g.axes[rowidx,colidx].text(0.5, 0.5, 'No regions significant',
+                                  horizontalalignment='center', fontsize='x-large',
+                                  verticalalignment='center', transform=g.axes[rowidx,colidx].transAxes)
+                elif np.sum(plotdata) > 0.:
+                    im = plotdata.plot.contourf(ax=g.axes[rowidx,colidx], transform=ccrs.PlateCarree(),
+                                                    cmap=cmap, levels=clevels,
                                                     subplot_kws={'projection':map_proj},
                                                     add_colorbar=False)
+                    plotdata = plotrow.sel(names_col=names_col[1])
+                    if np.sum(plotdata) != 0.:
+                        contourmask = np.array(np.nan_to_num(plotdata.where(plotdata > 0.)), dtype=int)
+                        plotdata.data = contourmask
+                        plotdata.plot.contour(ax=g.axes[rowidx,colidx], transform=ccrs.PlateCarree(),
+                                                            colors=['black'], levels=levels,
+                                                            subplot_kws={'projection':map_proj},
+                                                            add_colorbar=False)
             
             g.axes[rowidx,0].text(-figwidth/100, 0.5, row,
                       horizontalalignment='center', fontsize='x-large',
@@ -501,6 +495,8 @@ def plottingfunction(ex, parents_RV, var_names, outdic_actors, map_proj):
 #        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
         plt.subplots_adjust(wspace=0.1, hspace=-0.3)
         g.fig.savefig(os.path.join(ex['fig_path'], file_name + ex['file_type2']),dpi=250)
+        if ex['showplot'] == False:
+            plt.close()
         return
     
     

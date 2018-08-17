@@ -56,7 +56,8 @@ ex = dict(
      )
 
 
-# True if you want to download ncdfs through ECMWF MARS, only analytical fields 
+# True if you want to download ncdfs in ex['vars'] through ECMWF MARS, 
+# only analytical fields 
 ECMWFdownload = True
 # True if you have your own Response Variable time serie you want to insert
 importRVts = True
@@ -86,9 +87,9 @@ ex['own_RV_nc_name'] = []
 # You need the ecmwf-api-client package for this option.
 if ECMWFdownload == True:
     # See http://apps.ecmwf.int/datasets/. 
-    ex['vars']      =       [['t2m', 'sst'],['167.128','34.128'],['sfc', 'sfc'],[0, 0]]
+#    ex['vars']      =       [['t2m', 'sst'],['167.128','34.128'],['sfc', 'sfc'],[0, 0]]
 #    ex['vars']      =       [['t2m', 'u'],['167.128', '131.128'],['sfc', 'pl'],[0, '500']]
-#    ex['vars']      =       [['t2m', 'sst', 'u'],['167.128', '34.128', '131.128'],['sfc', 'sfc', 'pl'],[0, 0, '500']]
+    ex['vars']      =       [['t2m', 'sst', 'u'],['167.128', '34.128', '131.128'],['sfc', 'sfc', 'pl'],[0, 0, '500']]
 #    ex['vars']      =       [['t2m', 'sst', 'u', 't100'],
 #                            ['167.128', '34.128', '131.128', '130.128'],
 #                            ['sfc', 'sfc', 'pl', 'pl'],[0, 0, '500', '100']]
@@ -136,9 +137,9 @@ if ECMWFdownload == True:
 # *****************************************************************************
 # Information needed to pre-process, 
 # Select temporal frequency:
-ex['tfreq'] = 14
+ex['tfreq'] = 7
 # s(elect)startdate and enddate create the period/season you want to investigate:
-ex['sstartdate'] = '{}-6-1 09:00:00'.format(ex['startyear'])
+ex['sstartdate'] = '{}-5-1 09:00:00'.format(ex['startyear'])
 ex['senddate']   = '{}-8-31 09:00:00'.format(ex['startyear'])
 
 ex['exp_pp'] = '{}_m{}-{}_dt{}'.format(RV_actor_names, 
@@ -256,7 +257,7 @@ np.save(filename_exp_design1, ex)
 # *****************************************************************************
 # *****************************************************************************
 ex = np.load(filename_exp_design1).item()
-ex['lag_min'] = 3 # Lag time(s) of interest
+ex['lag_min'] = 1 # Lag time(s) of interest
 ex['lag_max'] = 4 
 ex['alpha'] = 0.01 # set significnace level for correlation maps
 ex['alpha_fdr'] = 2*ex['alpha'] # conservative significance level
@@ -281,7 +282,7 @@ ex['lo_max'] = 360
 # Some output settings
 ex['file_type1'] = ".pdf"
 ex['file_type2'] = ".png" 
-ex['excludeRV'] = 0 # if 0, then RV is also considered as possible actor (autocorr)
+ex['excludeRV'] = 0 # if 0, then first of ex['vars'] is also considered as actor
 ex['SaveTF'] = True # if false, output will be printed in console
 ex['plotin1fig'] = False 
 ex['showplot'] = True
