@@ -372,3 +372,52 @@ def find_region(data, region='EU'):
         lat_idx = np.arange(find_nearest(data['latitude'],north_lat),find_nearest(data['latitude'],south_lat),1)
 
     return all_values, region_coords
+
+def xarray_plot(data, path='default', saving=False):
+    # from plotting import save_figure
+    import matplotlib.pyplot as plt
+    import cartopy.crs as ccrs
+    import numpy as np
+    plt.figure()
+    data = np.squeeze(data)
+    if len(data.longitude[np.where(data.longitude > 180)[0]]) != 0:
+        data = convert_longitude(data)
+    else:
+        pass
+    if data.ndim != 2:
+        print "number of dimension is {}, printing first element of first dimension".format(np.squeeze(data).ndim)
+        data = data[0]
+    else:
+        pass
+    if 'mask' in data.coords.keys():
+        cen_lon = data.where(data.mask==True, drop=True).longitude.mean()
+        data = data.where(data.mask==True, drop=True)
+    else:
+        cen_lon = data.longitude.mean().values
+    proj = ccrs.Orthographic(central_longitude=cen_lon.values, central_latitude=data.latitude.mean().values)
+    ax = plt.axes(projection=proj)
+    ax.coastlines()
+    # ax.set_global()
+    if 'mask' in data.coords.keys():
+        plot = data.where(data.mask==True).plot.pcolormesh(ax=ax, cmap=plt.cm.RdBu_r,
+                             transform=ccrs.PlateCarree(), add_colorbar=True)
+    else:
+        plot = data.plot.pcolormesh(ax=ax, cmap=plt.cm.RdBu_r,
+                             transform=ccrs.PlateCarree(), add_colorbar=True)
+    if saving == True:
+        save_figure(data, path=path)
+    plt.show()
+
+def convert_longitude(data):
+    import numpy as np
+    import xarray as xr
+    lon_above = data.longitude[np.where(data.longitude > 180)[0]]
+    lon_normal = data.longitude[np.where(data.longitude <= 180)[0]]
+    # roll all values to the right for len(lon_above amount of steps)
+    data = data.roll(longitude=len(lon_above))
+    # adapt longitude values above 180 to negative values
+    substract = lambda x, y: (x - y)
+    lon_above = xr.apply_ufunc(substract, lon_above, 360)
+    convert_lon = xr.concat([lon_above, lon_normal], dim='longitude')
+    data['longitude'] = convert_lon
+    return data

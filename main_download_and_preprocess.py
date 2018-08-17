@@ -46,7 +46,7 @@ if os.path.isdir(path_pp) == False: os.makedirs(path_pp)
 # from these break points. It also stored as a log in the final output.
 ex = dict(
      {'dataset'     :       'ERA-i',
-      'vars'        :       [['t2m', 'u']],     # ['name_RV','name_actor1', ...]
+#      'vars'        :       [['t2m', 'u']],     # ['name_RV','name_actor1', ...]
      'grid_res'     :       2.5,
      'startyear'    :       1979,
      'endyear'      :       2017,
@@ -60,26 +60,12 @@ ex = dict(
 # only analytical fields 
 ECMWFdownload = True
 # True if you have your own Response Variable time serie you want to insert
-importRVts = True
-if importRVts == True:
-    RV_name = 'tmax_EUS'
-    RV_actor_names = RV_name + '_' + "_".join(ex['vars'][0])
-    ex['RVts_filename'] = '15Jun-24Aug_compAggljacc'
-    
-else:
-    # if no time series is imported, it will take the first of ex['vars] as the
-    # Response Variable
-    RV_name = ex['vars'][0][0]
-    RV_actor_names = "_".join(ex['vars'][0])
-    # if import RVts == False, then a spatial mask is used to create the required
-    # 1D timeseries.
-    ex['maskname'] = '2.5natearth_with_US_mask'
+importRVts = False 
     
 # own ncdfs must have same period, daily data and on same grid
 ex['own_actor_nc_names'] = [[]]
-ex['own_RV_nc_name'] = []
-#ex['own_RV_nc_name'] = ['t2mmax', 't2mmax_1979-2017_1_12_daily_2.5deg.nc']
-
+#ex['own_RV_nc_name'] = []
+ex['own_RV_nc_name'] = ['t2mmax', 't2mmax_1979-2017_1_12_daily_2.5deg.nc']
 
 # =============================================================================
 # Info to download ncdf from ECMWF, atm only analytical fields (no forecasts)
@@ -87,8 +73,8 @@ ex['own_RV_nc_name'] = []
 # You need the ecmwf-api-client package for this option.
 if ECMWFdownload == True:
     # See http://apps.ecmwf.int/datasets/. 
+#    ex['vars']      =       [['t2m'],['167.128'],['sfc'],[0]]
 #    ex['vars']      =       [['t2m', 'sst'],['167.128','34.128'],['sfc', 'sfc'],[0, 0]]
-#    ex['vars']      =       [['t2m', 'u'],['167.128', '131.128'],['sfc', 'pl'],[0, '500']]
     ex['vars']      =       [['t2m', 'sst', 'u'],['167.128', '34.128', '131.128'],['sfc', 'sfc', 'pl'],[0, 0, '500']]
 #    ex['vars']      =       [['t2m', 'sst', 'u', 't100'],
 #                            ['167.128', '34.128', '131.128', '130.128'],
@@ -119,11 +105,29 @@ if len(ex['own_actor_nc_names'][0]) != 0:
         ECMWFdownload = False
         var_class = functions_pp.Variable(ex, idx, ECMWFdownload) 
         ex[ex['vars'][0][idx]] = var_class
-if len(ex['own_RV_nc_name']) != 0:
+if len(ex['own_RV_nc_name']) != 0 and importRVts == False:
     ECMWFdownload = False
+    RV_name = ex['own_RV_nc_name'][0]
     var_class = functions_pp.Variable(ex, idx, ECMWFdownload) 
-    ex[ex['vars'][0][0]] = var_class
-
+    ex[ex['own_RV_nc_name'][0]] = var_class
+# =============================================================================
+# Now we have collected all info on what variables will be analyzed, based on
+# downloading, own netcdfs / importing RV time serie.
+# =============================================================================
+if importRVts == True:
+    RV_name = 'tmax_EUS'
+    RV_actor_names = RV_name + '_' + "_".join(ex['vars'][0])
+    ex['RVts_filename'] = 't2mmax_1Jun-24Aug_compAggljacc_tf14_n7.npy'
+    
+elif importRVts == False:
+    # if no time series is imported, it will take the first of ex['vars] as the
+    # Response Variable
+    RV_name = ex['vars'][0][0]
+    RV_actor_names = "_".join(ex['vars'][0])
+    # if import RVts == False, then a spatial mask is used for the RV
+    ex['maskname'] = 'comp_tf14_n7'
+    ex['path_masks'] = os.path.join(ex['path_pp'], 'RVts2.5', 
+                          't2mmax_1Jun-24Aug_compAggljacc_tf14_n7'+'.npy')
 # =============================================================================
 # Downloading data from Era-interim?  
 # =============================================================================
@@ -131,15 +135,16 @@ if ECMWFdownload == True:
     for var in ex['vars'][0]:
         var_class = ex[var]
         retrieve_ERA_i_field(var_class)
-
 # *****************************************************************************
 # Step 2 Preprocess data (this function uses cdo and nco)
 # *****************************************************************************
 # Information needed to pre-process, 
 # Select temporal frequency:
-ex['tfreq'] = 7
+#ex['tfreqlist'] = [1,4,7,12,20,30]
+#for freq in ex['tfreqlist']:
+ex['tfreq'] = 10
 # s(elect)startdate and enddate create the period/season you want to investigate:
-ex['sstartdate'] = '{}-5-1 09:00:00'.format(ex['startyear'])
+ex['sstartdate'] = '{}-4-1 09:00:00'.format(ex['startyear'])
 ex['senddate']   = '{}-8-31 09:00:00'.format(ex['startyear'])
 
 ex['exp_pp'] = '{}_m{}-{}_dt{}'.format(RV_actor_names, 
@@ -163,7 +168,7 @@ for var in ex['vars'][0]:
         pass
     else:    
         functions_pp.preprocessing_ncdf(outfile, datesstr, var_class, ex)
-#%%  
+  
 # *****************************************************************************
 # Step 3 Preprocess Response Variable (RV) 
 # *****************************************************************************  
@@ -172,7 +177,8 @@ for var in ex['vars'][0]:
 # =============================================================================
 if importRVts == True:
     RV_name = 'RV_imp'
-    dicRV = pickle.load( open(os.path.join(ex['path_pp'],ex['RVts_filename']+'.pkl'), "rb") ) 
+    dicRV = np.load(os.path.join(ex['path_pp'], 'RVts2.5', ex['RVts_filename'])).item()
+#    dicRV = pickle.load( open(os.path.join(ex['path_pp'],ex['RVts_filename']+'.pkl'), "rb") ) 
     
     class RV_seperateclass:
         RVfullts = dicRV['RVfullts']
@@ -221,20 +227,20 @@ elif importRVts == False:
     # one using the first variable listed in ex['vars']. You can 
     # load a spatial mask here and use it to create your
     # full timeseries (of length equal to actor time series)  
-    path_masks = os.path.join(ex['path_raw'], 'grids', ex['maskname']+'.npy')                                                 
+                                                    
     try:
-        lsm_coun_mask = np.load(path_masks).item()
-        US_mask = lsm_coun_mask['US_mask']
-        nor_lon = US_mask.longitude
-        US_mask = US_mask.roll(longitude=2)
-        US_mask['longitude'] = nor_lon
-        plotting.xarray_plot(US_mask)
+        mask_dic = np.load(ex['path_masks']).item()
+        RV_array = mask_dic['RV_array']
+#        nor_lon = mask.longitude
+#        US_mask = mask.roll(longitude=2)
+#        mask['longitude'] = nor_lon
+        functions_pp.xarray_plot(RV_array)
     except IOError, e:
-        print('\n\n**\nSpatial mask not found.\n'
-              'Place your spatial mask in folder: \n{}\n'
-              'and rerun this section.\n**'.format(ex['path_pp'], 'grids'))
+        print('\n\n**\nSpatial mask not found.\n')
+#              'Place your spatial mask in folder: \n{}\n'
+#              'and rerun this section.\n**'.format(ex['path_pp'], 'grids'))
         raise(e)
-    RVarray.coords['mask'] = (('latitude','longitude'), US_mask.mask)
+    RVarray.coords['mask'] = RV_array.mask
     RV.RVfullts = RVarray.where(RVarray.mask==False).mean(dim=['latitude','longitude']).squeeze()
 
 RV.RV_ts = RV.RVfullts[ex['RV_period']] # extract specific months of MT index 
@@ -285,7 +291,7 @@ ex['file_type2'] = ".png"
 ex['excludeRV'] = 0 # if 0, then first of ex['vars'] is also considered as actor
 ex['SaveTF'] = True # if false, output will be printed in console
 ex['plotin1fig'] = False 
-ex['showplot'] = True
+ex['showplot'] = False
 central_lon_plots = 240
 map_proj = ccrs.LambertCylindrical(central_longitude=central_lon_plots)
 # output paths
