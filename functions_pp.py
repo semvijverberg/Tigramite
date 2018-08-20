@@ -210,21 +210,57 @@ def datestr_for_preproc(cls, ex):
     fit_steps_yr = (end_day - seldays_pp.min())  / temporal_freq
     # line below: The +1 = include day 1 in counting
     start_day = (end_day - (temporal_freq * np.round(fit_steps_yr, decimals=0))) + 1 
-    curr_yr = pd.DatetimeIndex(start=start_day, end=end_day, 
-                                freq=(dates[1] - dates[0]))
     # create datestring for MARS download request
-    datesstr = [str(date).split('.', 1)[0] for date in curr_yr.values]
-    nyears = (dates.year[-1] - dates.year[0])+1
-    for yr in range(1,nyears):
-        if calendar.isleap(yr+dates.year[0]) == True:
-            next_yr = curr_yr + pd.Timedelta('{}d'.format(366))
-        elif calendar.isleap(yr+dates.year[0]) == False:
-            next_yr = curr_yr + pd.Timedelta('{}d'.format(365))
-        curr_yr = next_yr
-        nextstr = [str(date).split('.', 1)[0] for date in next_yr.values]
-        datesstr = datesstr + nextstr
+    def make_datestr(dates, start_yr):
+#        if start_yr.year[0] != dates.year[0]:
+#            diffyrs = dates.year.min() - start_yr.year.min()
+#            upd_start = start_yr + np.timedelta64(diffyrs, 'Y')
+#            timeofupd = pd.to_datetime(upd_start.min().strftime(('%H:%M:%S')))
+#            timeofnc  = pd.to_datetime(start_yr.min().strftime(('%H:%M:%S')))
+#            start_yr = upd_start + (timeofnc - timeofupd)
+#            start_yr = upd_start.min()
+#            upd_start_d = start_day + (dates.min() - start_day)
+#            upd_start_d = upd_start_yr + start_day.dayofyear - dates.min().dayofyear
+        breakyr = dates.year.max()
+        datesstr = [str(date).split('.', 1)[0] for date in start_yr.values]
+        nyears = (dates.year[-1] - dates.year[0])+1
+        for yr in range(1,nyears):
+            if calendar.isleap(yr+dates.year[0]) == True:
+                next_yr = start_yr + pd.Timedelta('{}d'.format(366))
+            elif calendar.isleap(yr+dates.year[0]) == False:
+                next_yr = start_yr + pd.Timedelta('{}d'.format(365))
+            start_yr = next_yr
+            
+            nextstr = [str(date).split('.', 1)[0] for date in next_yr.values]
+            datesstr = datesstr + nextstr
+            
+            if calendar.isleap(yr+dates.year[0]) == True:
+                upd_start_yr = start_yr + pd.Timedelta('{}d'.format(366))
+            elif calendar.isleap(yr+dates.year[0]) == False:
+                upd_start_yr = start_yr + pd.Timedelta('{}d'.format(365))
+            if next_yr.year[0] == breakyr:
+                break
+            
+        return datesstr, upd_start_yr
+#    datesstr = make_datestr(dates, start_yr)
     # store the adjusted dates in np.datetime64 format in var_class
-    cls.dates = pd.to_datetime(datesstr)
+#    cls.dates = pd.to_datetime(datesstr)
+# =============================================================================
+#   # sel_dates string is too long for high # of timesteps, so slicing timeseries
+#   # in 2. 
+# =============================================================================
+    dateofslice = dates[int(len(dates)/2.)]
+    idxsd = np.argwhere(dates == dateofslice)[0][0]
+    dates1 = dates[:idxsd]
+    dates2 = dates[idxsd:]
+    start_yr = pd.DatetimeIndex(start=start_day, end=end_day, 
+                                freq=(dates[1] - dates[0]))
+    datesstr1, start_yr = make_datestr(dates1, start_yr)
+    datesstr2, start_yr = make_datestr(dates2, start_yr)
+    datesstr = [datesstr1, datesstr2]
+#    datelist = [date.strftime('%Y-%m-%dT%H:%M:%S') for date in list(dates)]
+#    firsthalfts = convert_list_cdo_string(datelist[:idxsd])
+#    seconhalfts = convert_list_cdo_string(datelist[idxsd:])
 # =============================================================================
 #   # give appropriate name to output file    
 # =============================================================================
@@ -264,7 +300,7 @@ def preprocessing_ncdf(outfile, datesstr, cls, ex):
     # Final input and output files
     infile = os.path.join(cls.path_raw, cls.filename)
     # convert to inter annual daily mean to make this faster
-    tmpfile = os.path.join(cls.path_raw, 'tmpfiles', 'tmp.nc')
+    tmpfile = os.path.join(cls.path_raw, 'tmpfiles', 'tmp')
     # check temporal frequency raw data
     file_path = os.path.join(cls.path_raw, cls.filename)
     ncdf = Dataset(file_path)
@@ -272,12 +308,23 @@ def preprocessing_ncdf(outfile, datesstr, cls, ex):
     dates = pd.to_datetime(num2date(numtime[:], units=numtime.units, calendar=numtime.calendar))
     timesteps = int(np.timedelta64(ex['tfreq'], 'D')  / (dates[1] - dates[0]))
     temporal_freq = np.timedelta64(ex['tfreq'], 'D') 
-# =============================================================================
-#   # commands to convert select days and temporal frequency 
-# =============================================================================
-    sel_dates = 'cdo select,date={} {} {}'.format(datesstr, infile, tmpfile)
-    sel_dates = sel_dates.replace(', ',',').replace('\'','').replace('[','').replace(']','')
-    convert_temp_freq = 'cdo timselmean,{} {} {}'.format(timesteps, tmpfile, outfile)
+    def cdostr(thelist):
+        string = str(thelist)
+        string = string.replace('[','').replace(']','').replace(' ' , '')
+        return string.replace('"','').replace('\'','')
+## =============================================================================
+##   # Select days and temporal frequency 
+## =============================================================================
+#    sel_dates = 'cdo select,date={} {} {}'.format(datesstr, infile, tmpfile)
+#    sel_dates = sel_dates.replace(', ',',').replace('\'','').replace('[','').replace(']','')
+#    convert_temp_freq = 'cdo timselmean,{} {} {}'.format(timesteps, tmpfile, outfile)
+
+    sel_dates1 = 'cdo -O select,date={} {} {}'.format(cdostr(datesstr[0]), infile, tmpfile+'1.nc')
+    sel_dates2 = 'cdo -O select,date={} {} {}'.format(cdostr(datesstr[1]), infile, tmpfile+'2.nc')
+    concat = 'cdo -O cat {} {} {}'.format(tmpfile+'1.nc', tmpfile+'2.nc', tmpfile+'sd.nc')
+    convert_temp_freq = 'cdo timselmean,{} {} {}'.format(timesteps, tmpfile+'sd.nc', tmpfile+'tf.nc')
+    convert_time_axis = 'cdo setreftime,1900-01-01,00:00:00 -setcalendar,gregorian {} {}'.format(
+            tmpfile+'tf.nc', tmpfile+'hom.nc')
 # =============================================================================
 #    # problem with remapping, ruins the time coordinates
 # =============================================================================
@@ -294,24 +341,30 @@ def preprocessing_ncdf(outfile, datesstr, cls, ex):
 #    overwrite_taxis =   'cdo settaxis,{},1month {} {}'.format(starttime.strftime('%Y-%m-%d,%H:%M'), tmpfile, tmpfile)
 #    del_leapdays = 'cdo delete,month=2,day=29 {} {}'.format(infile, tmpfile)
 # =============================================================================
+#  # detrend
+# =============================================================================
+    detrend = 'cdo -b 32 detrend {} {}'.format(tmpfile+'hom.nc', tmpfile+'det.nc')
+# =============================================================================
+#  # calculate anomalies w.r.t. interannual daily mean
+# =============================================================================
+#    clim = 'cdo ydaymean {} {}'.format(outfile, tmpfile)
+    anom = 'cdo -b 32 ydaysub {} -ydayavg {} {}'.format(tmpfile+'det.nc', 
+                              tmpfile+'det.nc', tmpfile+'an.nc')
+# =============================================================================
 #   # commands to homogenize data
 # =============================================================================
-    convert_time_axis = 'cdo setreftime,1900-01-01,00:00:00 -setcalendar,gregorian {} {}'.format(outfile, outfile)
-    rm_timebnds = 'ncks -O -C -x -v time_bnds {} {}'.format(outfile, outfile)
-    rm_res_timebnds = 'ncpdq -O {} {}'.format(outfile, outfile)
+    rm_timebnds = 'ncks -O -C -x -v time_bnds {} {}'.format(tmpfile+'hom.nc', tmpfile+'homrm.nc')
+    rm_res_timebnds = 'ncpdq -O {} {}'.format(tmpfile+'homrm.nc', outfile)
     variables = ncdf.variables.keys()
-    [var for var in variables if var not in 'longitude time latitude']    
+    [var for var in variables if var not in 'longitude time latitude time_bnds']    
     add_path_raw = 'ncatted -a path_raw,global,c,c,{} {}'.format(str(ncdf.filepath()), outfile) 
     add_units = 'ncatted -a units,global,c,c,{} {}'.format(ncdf.variables[var].units, outfile) 
-    detrend = 'cdo -b 32 detrend {} {}'.format(outfile, tmpfile)
-#    clim = 'cdo ydaymean {} {}'.format(outfile, tmpfile)
-    anom = 'cdo -b 32 ydaysub {} -ydayavg {} {}'.format(tmpfile, tmpfile, outfile) 
+ 
     echo_end = "echo data is detrended and are anomaly versus muli-year daily mean\n"
-    echo_test = 'echo test'
     ncdf.close()
     # ORDER of commands, --> is important!
-    args = [sel_dates, convert_temp_freq, convert_time_axis, rm_timebnds, rm_res_timebnds, 
-            add_path_raw, add_units, detrend, anom, echo_end, echo_test] 
+    args = [sel_dates1, sel_dates2, concat, convert_temp_freq, convert_time_axis, 
+            detrend, anom, rm_timebnds, rm_res_timebnds, add_path_raw, add_units,echo_end]
     kornshell_with_input(args)
 # =============================================================================
 #     # update class (more a check if dates are indeed correct)
@@ -421,3 +474,12 @@ def convert_longitude(data):
     convert_lon = xr.concat([lon_above, lon_normal], dim='longitude')
     data['longitude'] = convert_lon
     return data
+
+
+def detrend1D(da):
+    import scipy.signal as sps
+    import xarray as xr
+    dao = xr.DataArray(sps.detrend(da),
+                            dims=da.dims, coords=da.coords)
+    return dao
+

@@ -6,7 +6,7 @@ Created on Mon Jul  9 17:48:31 2018
 @author: semvijverberg
 """
 import os, sys
-os.chdir('/Users/semvijverberg/surfdrive/Scripts/Tigramite')
+os.chdir('/Users/semvijverberg/Surfdrive/Scripts/Tigramite')
 script_dir = os.getcwd()
 import numpy as np
 import pandas as pd
@@ -33,6 +33,7 @@ import_array = functions_pp.import_array
 # this will be your basepath, all raw_input and output will stored in subfolder 
 # which will be made when running the code
 base_path = "/Users/semvijverberg/surfdrive/Data_ERAint/"
+exp_folder = 't2m_max_u_diff_tfreqs'
 path_raw = os.path.join(base_path, 'input_raw')
 path_pp  = os.path.join(base_path, 'input_pp')
 if os.path.isdir(path_raw) == False : os.makedirs(path_raw) 
@@ -46,7 +47,6 @@ if os.path.isdir(path_pp) == False: os.makedirs(path_pp)
 # from these break points. It also stored as a log in the final output.
 ex = dict(
      {'dataset'     :       'ERA-i',
-#      'vars'        :       [['t2m', 'u']],     # ['name_RV','name_actor1', ...]
      'grid_res'     :       2.5,
      'startyear'    :       1979,
      'endyear'      :       2017,
@@ -66,7 +66,7 @@ importRVts = False
 ex['own_actor_nc_names'] = [[]]
 #ex['own_RV_nc_name'] = []
 ex['own_RV_nc_name'] = ['t2mmax', 't2mmax_1979-2017_1_12_daily_2.5deg.nc']
-
+ex['excludeRV'] = 1 # if 0, then corr fields are calculated vs. first of ex['vars'] 
 # =============================================================================
 # Info to download ncdf from ECMWF, atm only analytical fields (no forecasts)
 # =============================================================================
@@ -75,7 +75,7 @@ if ECMWFdownload == True:
     # See http://apps.ecmwf.int/datasets/. 
 #    ex['vars']      =       [['t2m'],['167.128'],['sfc'],[0]]
 #    ex['vars']      =       [['t2m', 'sst'],['167.128','34.128'],['sfc', 'sfc'],[0, 0]]
-    ex['vars']      =       [['t2m', 'sst', 'u'],['167.128', '34.128', '131.128'],['sfc', 'sfc', 'pl'],[0, 0, '500']]
+    ex['vars']      =       [['sst'],['34.128'],['sfc'],['0']]
 #    ex['vars']      =       [['t2m', 'sst', 'u', 't100'],
 #                            ['167.128', '34.128', '131.128', '130.128'],
 #                            ['sfc', 'sfc', 'pl', 'pl'],[0, 0, '500', '100']]
@@ -110,6 +110,7 @@ if len(ex['own_RV_nc_name']) != 0 and importRVts == False:
     RV_name = ex['own_RV_nc_name'][0]
     var_class = functions_pp.Variable(ex, idx, ECMWFdownload) 
     ex[ex['own_RV_nc_name'][0]] = var_class
+    print('inserted own netcdf as Response Variable {}\n'.format(RV_name))
 # =============================================================================
 # Now we have collected all info on what variables will be analyzed, based on
 # downloading, own netcdfs / importing RV time serie.
@@ -127,7 +128,7 @@ elif importRVts == False:
     # if import RVts == False, then a spatial mask is used for the RV
     ex['maskname'] = 'comp_tf14_n7'
     ex['path_masks'] = os.path.join(ex['path_pp'], 'RVts2.5', 
-                          't2mmax_1Jun-24Aug_compAggljacc_tf14_n7'+'.npy')
+                          't2mmax_1Jun-24Aug_compAggljacc_tf14_n9'+'.npy')
 # =============================================================================
 # Downloading data from Era-interim?  
 # =============================================================================
@@ -142,7 +143,7 @@ if ECMWFdownload == True:
 # Select temporal frequency:
 #ex['tfreqlist'] = [1,4,7,12,20,30]
 #for freq in ex['tfreqlist']:
-ex['tfreq'] = 10
+ex['tfreq'] = 3
 # s(elect)startdate and enddate create the period/season you want to investigate:
 ex['sstartdate'] = '{}-4-1 09:00:00'.format(ex['startyear'])
 ex['senddate']   = '{}-8-31 09:00:00'.format(ex['startyear'])
@@ -150,7 +151,7 @@ ex['senddate']   = '{}-8-31 09:00:00'.format(ex['startyear'])
 ex['exp_pp'] = '{}_m{}-{}_dt{}'.format(RV_actor_names, 
                     ex['sstartdate'].split('-')[1], ex['senddate'].split('-')[1], ex['tfreq'])
 
-ex['path_exp'] = os.path.join(base_path, ex['exp_pp'])
+ex['path_exp'] = os.path.join(base_path, exp_folder, ex['exp_pp'])
 if os.path.isdir(ex['path_exp']) == False : os.makedirs(ex['path_exp'])
 
 # =============================================================================
@@ -263,7 +264,7 @@ np.save(filename_exp_design1, ex)
 # *****************************************************************************
 # *****************************************************************************
 ex = np.load(filename_exp_design1).item()
-ex['lag_min'] = 1 # Lag time(s) of interest
+ex['lag_min'] = 3 # Lag time(s) of interest
 ex['lag_max'] = 4 
 ex['alpha'] = 0.01 # set significnace level for correlation maps
 ex['alpha_fdr'] = 2*ex['alpha'] # conservative significance level
@@ -288,7 +289,6 @@ ex['lo_max'] = 360
 # Some output settings
 ex['file_type1'] = ".pdf"
 ex['file_type2'] = ".png" 
-ex['excludeRV'] = 0 # if 0, then first of ex['vars'] is also considered as actor
 ex['SaveTF'] = True # if false, output will be printed in console
 ex['plotin1fig'] = False 
 ex['showplot'] = False
