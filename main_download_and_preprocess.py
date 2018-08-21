@@ -143,17 +143,19 @@ if ECMWFdownload == True:
 # Select temporal frequency:
 #ex['tfreqlist'] = [1,4,7,12,20,30]
 #for freq in ex['tfreqlist']:
-ex['tfreq'] = 3
+ex['tfreq'] = 30
+# choose lags to test
+ex['lag_min'] = int(np.timedelta64(2, 'W') / np.timedelta64(ex['tfreq'], 'D')) 
+ex['lag_max'] = 6
 # s(elect)startdate and enddate create the period/season you want to investigate:
-ex['sstartdate'] = '{}-4-1 09:00:00'.format(ex['startyear'])
-ex['senddate']   = '{}-8-31 09:00:00'.format(ex['startyear'])
+ex['sstartdate'] = '{}-1-1 09:00:00'.format(ex['startyear'])
+ex['senddate']   = '{}-12-31 09:00:00'.format(ex['startyear'])
 
 ex['exp_pp'] = '{}_m{}-{}_dt{}'.format(RV_actor_names, 
                     ex['sstartdate'].split('-')[1], ex['senddate'].split('-')[1], ex['tfreq'])
 
 ex['path_exp'] = os.path.join(base_path, exp_folder, ex['exp_pp'])
 if os.path.isdir(ex['path_exp']) == False : os.makedirs(ex['path_exp'])
-
 # =============================================================================
 # Preprocess data (this function uses cdo/nco and requires execution rights of
 # the created bash script)
@@ -166,6 +168,8 @@ for var in ex['vars'][0]:
     if os.path.isfile(outfile) == True: 
         print('looks like you already have done the pre-processing,\n'
               'to save time let\'s not do it twice..')
+        # but we will update the dates stored in var_class:
+        var_class, ex = functions_pp.update_dates(var_class, ex)
         pass
     else:    
         functions_pp.preprocessing_ncdf(outfile, datesstr, var_class, ex)
@@ -205,11 +209,11 @@ for mon in months:
 RV_period = [x for sublist in RV_period for x in sublist]
 RV_period.sort()
 ex['RV_period'] = RV_period
-ex['RV_oneyr'] = RV.dates[RV_period].where(RV.dates[RV_period].year == RV.startyear+1).dropna()
+RV.dates = RV.dates[RV_period]
 months = dict( {1:'jan',2:'feb',3:'mar',4:'apr',5:'may',6:'jun',
                 7:'jul',8:'aug',9:'sep',10:'okt',11:'nov',12:'dec' } )
-RV_name_range = '{}{}-{}{}_'.format(ex['RV_oneyr'].min().day, months[ex['RV_oneyr'].min().month], 
-                 ex['RV_oneyr'].max().day, months[ex['RV_oneyr'].max().month] )
+RV_name_range = '{}{}-{}{}_'.format(RV.dates[0].day, months[RV.dates.month[0]], 
+                 RV.dates[-1].day, months[RV.dates.month[-1]] )
 
 # =============================================================================
 # 3.2 Select spatial mask to create 1D timeseries (e.g. a SREX region)
@@ -221,28 +225,32 @@ RV_name_range = '{}{}-{}{}_'.format(ex['RV_oneyr'].min().day, months[ex['RV_oney
 if importRVts == True:
     i = len(RV_name_range)
     ex['path_exp_periodmask'] = os.path.join(ex['path_exp'], RV_name_range + 
-                                  ex['RVts_filename'][i:] )
+                                  ex['RVts_filename'][i:] + 
+                                  '_lag{}-{}'.format(ex['lag_min'], ex['lag_max']) )
+                                          
 elif importRVts == False:
-    ex['path_exp_periodmask'] = os.path.join(ex['path_exp'], RV_name_range + ex['maskname'] )
-    # If you don't have your own timeseries yet, then we assume you want to make
-    # one using the first variable listed in ex['vars']. You can 
-    # load a spatial mask here and use it to create your
-    # full timeseries (of length equal to actor time series)  
-                                                    
-    try:
-        mask_dic = np.load(ex['path_masks']).item()
-        RV_array = mask_dic['RV_array']
+    ex['path_exp_periodmask'] = os.path.join(ex['path_exp'], RV_name_range + 
+                                  ex['maskname'] +
+                                  '_lag{}-{}'.format(ex['lag_min'], ex['lag_max']))
+# If you don't have your own timeseries yet, then we assume you want to make
+# one using the first variable listed in ex['vars']. You can 
+# load a spatial mask here and use it to create your
+# full timeseries (of length equal to actor time series)  
+                                                
+try:
+    mask_dic = np.load(ex['path_masks']).item()
+    RV_array = mask_dic['RV_array']
 #        nor_lon = mask.longitude
 #        US_mask = mask.roll(longitude=2)
 #        mask['longitude'] = nor_lon
-        functions_pp.xarray_plot(RV_array)
-    except IOError, e:
-        print('\n\n**\nSpatial mask not found.\n')
+    functions_pp.xarray_plot(RV_array)
+except IOError, e:
+    print('\n\n**\nSpatial mask not found.\n')
 #              'Place your spatial mask in folder: \n{}\n'
 #              'and rerun this section.\n**'.format(ex['path_pp'], 'grids'))
-        raise(e)
-    RVarray.coords['mask'] = RV_array.mask
-    RV.RVfullts = RVarray.where(RVarray.mask==False).mean(dim=['latitude','longitude']).squeeze()
+    raise(e)
+RVarray.coords['mask'] = RV_array.mask
+RV.RVfullts = RVarray.where(RVarray.mask==False).mean(dim=['latitude','longitude']).squeeze()
 
 RV.RV_ts = RV.RVfullts[ex['RV_period']] # extract specific months of MT index 
 # Store added information in RV class to the exp dictionary
@@ -250,6 +258,16 @@ ex['RV_name'] = RV_name
 ex[RV_name] = RV
 
 
+# =============================================================================
+# Test if you're not have a lag that will precede the start date of the year
+# =============================================================================
+# first date of year to be analyzed:
+firstdoy = RV.dates.min() - np.timedelta64(ex['tfreq'] * ex['lag_max'], 'D')
+var = ex[ex['vars'][0][1]] # selecting the first actor
+if firstdoy < var.dates[0] and (var.dates[0].month,var.dates[0].day) != (1,1):
+    print 'Changing maximum lag, so that you not skip part of the year.'
+    tdelta = RV.dates.min() - var.dates.min()
+    ex['lag_max'] = int(tdelta / np.timedelta64(ex['tfreq'], 'D'))
 if os.path.isdir(ex['path_exp_periodmask']) != True : os.makedirs(ex['path_exp_periodmask'])
 filename_exp_design1 = os.path.join(ex['path_exp_periodmask'], 'input_dic_part_1.npy')
 
@@ -264,8 +282,6 @@ np.save(filename_exp_design1, ex)
 # *****************************************************************************
 # *****************************************************************************
 ex = np.load(filename_exp_design1).item()
-ex['lag_min'] = 3 # Lag time(s) of interest
-ex['lag_max'] = 4 
 ex['alpha'] = 0.01 # set significnace level for correlation maps
 ex['alpha_fdr'] = 2*ex['alpha'] # conservative significance level
 ex['FDR_control'] = False # Do you want to use the conservative alpha_fdr or normal alpha?

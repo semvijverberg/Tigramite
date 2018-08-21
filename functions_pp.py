@@ -255,8 +255,8 @@ def datestr_for_preproc(cls, ex):
     dates2 = dates[idxsd:]
     start_yr = pd.DatetimeIndex(start=start_day, end=end_day, 
                                 freq=(dates[1] - dates[0]))
-    datesstr1, start_yr = make_datestr(dates1, start_yr)
-    datesstr2, start_yr = make_datestr(dates2, start_yr)
+    datesstr1, next_yr = make_datestr(dates1, start_yr)
+    datesstr2, next_yr = make_datestr(dates2, next_yr)
     datesstr = [datesstr1, datesstr2]
 #    datelist = [date.strftime('%Y-%m-%dT%H:%M:%S') for date in list(dates)]
 #    firsthalfts = convert_list_cdo_string(datelist[:idxsd])
@@ -268,9 +268,11 @@ def datestr_for_preproc(cls, ex):
     outfilename = outfilename.replace('daily', 'dt-{}days'.format(ex['tfreq']))
     months = dict( {1:'jan',2:'feb',3:'mar',4:'apr',5:'may',6:'jun',7:'jul',
                          8:'aug',9:'sep',10:'okt',11:'nov',12:'dec' } )
-    
-    outfilename = outfilename.replace('_{}_'.format(1),'_{}{}_'.format(start_day.day, months[start_day.month]))
-    outfilename = outfilename.replace('_{}_'.format(12),'_{}{}_'.format(end_day.day, months[end_day.month]))
+
+    startdatestr = '_{}{}_'.format(start_day.day, months[start_day.month])
+    enddatestr   = '_{}{}_'.format(end_day.day, months[end_day.month])
+    outfilename = outfilename.replace('_{}_'.format(1), startdatestr)
+    outfilename = outfilename.replace('_{}_'.format(12), enddatestr)
     cls.filename_pp = outfilename
     cls.path_pp = ex['path_pp']
     outfile = os.path.join(ex['path_pp'], outfilename)
@@ -369,14 +371,24 @@ def preprocessing_ncdf(outfile, datesstr, cls, ex):
 # =============================================================================
 #     # update class (more a check if dates are indeed correct)
 # =============================================================================
+    cls, ex = update_dates(cls, ex)
+    return cls, ex
+
+def update_dates(cls, ex):
+    import os
+    from netCDF4 import Dataset
+    from netCDF4 import num2date
+    import pandas as pd
+    import numpy as np
+    temporal_freq = np.timedelta64(ex['tfreq'], 'D') 
     file_path = os.path.join(cls.path_pp, cls.filename_pp)
     ncdf = Dataset(file_path)
     numtime = ncdf.variables['time']
     dates = pd.to_datetime(num2date(numtime[:], units=numtime.units, calendar=numtime.calendar))
     cls.dates = dates
     cls.temporal_freq = '{}days'.format(temporal_freq.astype('timedelta64[D]').astype(int))
-    return 
-    
+    return cls, ex
+
 def import_array(cls, path='pp'):
     import os
     import xarray as xr
