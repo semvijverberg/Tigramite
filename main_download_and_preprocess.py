@@ -136,9 +136,9 @@ if ECMWFdownload == True:
     for var in ex['vars'][0]:
         var_class = ex[var]
         retrieve_ERA_i_field(var_class)
-# *****************************************************************************
-# Step 2 Preprocess data (this function uses cdo and nco)
-# *****************************************************************************
+# =============================================================================
+# General Temporal Settings, frequency, lags, part of year investigated
+# =============================================================================
 # Information needed to pre-process, 
 # Select temporal frequency:
 #ex['tfreqlist'] = [1,4,7,12,20,30]
@@ -147,7 +147,7 @@ ex['tfreq'] = 30
 # choose lags to test
 ex['lag_min'] = int(np.timedelta64(2, 'W') / np.timedelta64(ex['tfreq'], 'D')) 
 ex['lag_max'] = 6
-# s(elect)startdate and enddate create the period/season you want to investigate:
+# s(elect)startdate and enddate create the period of year you want to investigate:
 ex['sstartdate'] = '{}-1-1 09:00:00'.format(ex['startyear'])
 ex['senddate']   = '{}-12-31 09:00:00'.format(ex['startyear'])
 
@@ -173,10 +173,14 @@ for var in ex['vars'][0]:
         pass
     else:    
         functions_pp.preprocessing_ncdf(outfile, datesstr, var_class, ex)
-  
-# *****************************************************************************
-# Step 3 Preprocess Response Variable (RV) 
+
+
 # *****************************************************************************  
+# *****************************************************************************
+# Step 3 Settings for Response Variable (RV) 
+# *****************************************************************************  
+# *****************************************************************************
+        
 # =============================================================================
 # 3.1 Select RV period (which period of the year you want to predict)
 # =============================================================================
@@ -209,11 +213,11 @@ for mon in months:
 RV_period = [x for sublist in RV_period for x in sublist]
 RV_period.sort()
 ex['RV_period'] = RV_period
-RV.dates = RV.dates[RV_period]
+RV.datesRV = RV.dates[RV_period]
 months = dict( {1:'jan',2:'feb',3:'mar',4:'apr',5:'may',6:'jun',
                 7:'jul',8:'aug',9:'sep',10:'okt',11:'nov',12:'dec' } )
-RV_name_range = '{}{}-{}{}_'.format(RV.dates[0].day, months[RV.dates.month[0]], 
-                 RV.dates[-1].day, months[RV.dates.month[-1]] )
+RV_name_range = '{}{}-{}{}_'.format(RV.datesRV[0].day, months[RV.datesRV.month[0]], 
+                 RV.datesRV[-1].day, months[RV.datesRV.month[-1]] )
 
 # =============================================================================
 # 3.2 Select spatial mask to create 1D timeseries (e.g. a SREX region)
@@ -225,13 +229,11 @@ RV_name_range = '{}{}-{}{}_'.format(RV.dates[0].day, months[RV.dates.month[0]],
 if importRVts == True:
     i = len(RV_name_range)
     ex['path_exp_periodmask'] = os.path.join(ex['path_exp'], RV_name_range + 
-                                  ex['RVts_filename'][i:] + 
-                                  '_lag{}-{}'.format(ex['lag_min'], ex['lag_max']) )
+                                  ex['RVts_filename'][i:])
                                           
 elif importRVts == False:
     ex['path_exp_periodmask'] = os.path.join(ex['path_exp'], RV_name_range + 
-                                  ex['maskname'] +
-                                  '_lag{}-{}'.format(ex['lag_min'], ex['lag_max']))
+                                  ex['maskname'] )
 # If you don't have your own timeseries yet, then we assume you want to make
 # one using the first variable listed in ex['vars']. You can 
 # load a spatial mask here and use it to create your
@@ -257,17 +259,22 @@ RV.RV_ts = RV.RVfullts[ex['RV_period']] # extract specific months of MT index
 ex['RV_name'] = RV_name
 ex[RV_name] = RV
 
-
 # =============================================================================
 # Test if you're not have a lag that will precede the start date of the year
 # =============================================================================
 # first date of year to be analyzed:
-firstdoy = RV.dates.min() - np.timedelta64(ex['tfreq'] * ex['lag_max'], 'D')
+firstdoy = RV.datesRV.min() - np.timedelta64(ex['tfreq'] * ex['lag_max'], 'D')
 var = ex[ex['vars'][0][1]] # selecting the first actor
 if firstdoy < var.dates[0] and (var.dates[0].month,var.dates[0].day) != (1,1):
-    print 'Changing maximum lag, so that you not skip part of the year.'
-    tdelta = RV.dates.min() - var.dates.min()
+    tdelta = RV.datesRV.min() - var.dates.min()
     ex['lag_max'] = int(tdelta / np.timedelta64(ex['tfreq'], 'D'))
+    print('Changing maximum lag to {}, so that you not skip part of the ' 
+          'year.'.format(ex['lag_max']))
+
+ex['path_exp_periodmask'] =  ex['path_exp_periodmask'] + '_lag{}-{}'.format(
+                                                ex['lag_min'], ex['lag_max'])
+                            
+
 if os.path.isdir(ex['path_exp_periodmask']) != True : os.makedirs(ex['path_exp_periodmask'])
 filename_exp_design1 = os.path.join(ex['path_exp_periodmask'], 'input_dic_part_1.npy')
 
