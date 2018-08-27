@@ -16,13 +16,13 @@ def retrieve_ERA_i_field(cls):
 
 
     if os.path.isfile(path=file_path) == True:
-        print("You have already download the variable {} from {} to {} on grid {}d ".format(cls.name, cls.startyear, cls.endyear, cls.grid))
-        print("\n to path: {} \n ".format(file_path))
+        print(("You have already download the variable {} from {} to {} on grid {}d ".format(cls.name, cls.startyear, cls.endyear, cls.grid)))
+        print(("\n to path: {} \n ".format(file_path)))
         pass
     else:
-        print(" You WILL download variable {} \n stream is set to {} \n".format \
-            (cls.name, cls.stream))
-        print("\n to path: \n \n {} \n \n".format(file_path))
+        print((" You WILL download variable {} \n stream is set to {} \n".format \
+            (cls.name, cls.stream)))
+        print(("\n to path: \n \n {} \n \n".format(file_path)))
         # !/usr/bin/python
         if cls.levtype == 'sfc':
             server.retrieve({

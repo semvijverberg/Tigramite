@@ -24,18 +24,18 @@ class Variable:
         self.tfreq = tfreq
         self.dataset = dataset
         self.base_path = '/Users/semvijverberg/surfdrive/Data_ERAint/'
-        print exp
+        print(exp)
         self.path_pp = os.path.join(self.base_path, 'input_pp'+'_'+exp)
         self.path_raw = os.path.join(self.base_path, 'input_raw')
         if os.path.isdir(self.path_pp):
             pass
         else:
-            print("{}\n\npath input does not exist".format(self.path_pp))
+            print(("{}\n\npath input does not exist".format(self.path_pp)))
         filename_pp = '{}_{}-{}_{}_{}_dt-{}days_{}'.format(self.name, self.startyear, 
                     self.endyear, self.startmonth, self.endmonth, self.tfreq, 
                     self.grid).replace(' ', '_').replace('/','x')
         self.filename_pp = filename_pp +'.nc'
-        print("Variable function selected {} \n".format(self.filename_pp))
+        print(("Variable function selected {} \n".format(self.filename_pp)))
         
 def import_array(cls):
     import os
@@ -49,7 +49,7 @@ def import_array(cls):
     numtime = marray['time']
     dates = num2date(numtime, units=numtime.units, calendar=numtime.attrs['calendar'])
     dates_np = pd.to_datetime(dates)
-    print('temporal frequency \'dt\' is: \n{}'.format(dates_np[1]- dates_np[0]))
+    print(('temporal frequency \'dt\' is: \n{}'.format(dates_np[1]- dates_np[0])))
     marray['time'] = dates_np
     return marray
 
@@ -83,7 +83,7 @@ def find_region(data, region='EU'):
 def calc_anomaly(marray, cls, q = 0.95):
     import xarray as xr
     import numpy as np
-    print("calc_anomaly called for {}".format(cls.name, marray.shape))
+    print(("calc_anomaly called for {}".format(cls.name, marray.shape)))
     clim = marray.groupby('time.month').mean('time', keep_attrs=True)
     clim.name = 'clim_' + marray.name
     anom = marray.groupby('time.month') - clim
@@ -114,7 +114,7 @@ def xarray_plot(data, path='default', saving=False):
     else:
         pass
     if data.ndim != 2:
-        print "number of dimension is {}, printing first element of first dimension".format(np.squeeze(data).ndim)
+        print("number of dimension is {}, printing first element of first dimension".format(np.squeeze(data).ndim))
         data = data[0]
     else:
         pass
@@ -158,12 +158,12 @@ def save_figure(data, path):
     if data.name != '':
         name = data.name.replace(' ', '_')
     if 'name' in locals():
-        print 'input name is: {}'.format(name)
+        print('input name is: {}'.format(name))
         name = name + '_' + today + '.jpeg'
         pass
     else:
         name = 'fig_' + today + '.jpeg'
-    print('{} to path {}'.format(name, path))
+    print(('{} to path {}'.format(name, path)))
     plt.savefig(os.path.join(path,name), format='jpeg', bbox_inches='tight')
 
 
@@ -179,12 +179,12 @@ def xarray_plot_region(print_vars, outdic_actors, ex, map_proj):
     list_Corr = []
     list_mask = []
     if print_vars == 'all':
-        variables = outd.keys()[:]
+        variables = list(outd.keys())[:]
     else:
         variables = print_vars
         
     for var in variables:
-        lags = range(ex['lag_min'], ex['lag_max']+1)
+        lags = list(range(ex['lag_min'], ex['lag_max']+1))
         lags = ['{} ({} days)'.format(l, l*ex['tfreq']) for l in lags]
         lat = outd[var].lat_grid
         lon = outd[var].lon_grid
@@ -220,7 +220,7 @@ def xarray_plot_region(print_vars, outdic_actors, ex, map_proj):
         xrmaskvar = xrmask.sel(variable=var)
         for lag in lags:
             row = lags.index(lag)
-            print 'Plotting Corr maps {}, lag {}'.format(var, lag)
+            print('Plotting Corr maps {}, lag {}'.format(var, lag))
             plotdata = xrdatavar.sel(lag=lag)
             plotmask = xrmaskvar.sel(lag=lag)
             plotmask.plot.contour(ax=g.axes[row,col], transform=ccrs.PlateCarree(),

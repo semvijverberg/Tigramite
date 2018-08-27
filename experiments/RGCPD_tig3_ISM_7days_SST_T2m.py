@@ -118,7 +118,7 @@ n_steps = 20# (dates.where(dates.year==RV.startyear).max() - dates.where(dates.y
 # start_day = time-cycle, if alls values of the years should be considered
 start_day = 20 # (= 10ther entry in array), pythonic counting
 
-seas_indices = range(n_steps)
+seas_indices = list(range(n_steps))
 
 lag_steps = lag_max - lag_min +1
 time_range_all = [0, time_cycle * n_years]
@@ -148,7 +148,7 @@ time , nlats, nlons = RV_array.shape # [months , lat, lon]
 # mean over longitude and latitude
 cluster = 2
 clusters = np.squeeze(xr.Dataset.from_dict(np.load(os.path.join(RV.path_pp, 'clusters_dic.npy')).item()).to_array())
-print 
+print() 
 cluster_out = clusters.sel(cluster=cluster)
 functions_tig.xarray_plot(cluster_out)
 mask_RV = np.ma.masked_where(clusters.sel(cluster=0)<2*clusters.sel(cluster=0).std(), RV_array.isel(time=0))
@@ -284,7 +284,7 @@ for p in [0,]:#range(7):
     # ======================================================================================================================
     # new mask
     # ======================================================================================================================
-    print(data.shape)
+    print((data.shape))
     
     data_mask = np.ones(data.shape, dtype='bool') # true for actor months, false for RV months
     for i in range(4): # take into account 4 months starting from june=5
@@ -429,10 +429,10 @@ for p in [0,]:#range(7):
             name = ''.join([str(index_in_fulldata),'_',according_fullname])
             #fulldata[:,index_in_fulldata].dump(''.join(['/home/dicapua/GOTHAM/Data/output/RGCPD/monthly/precurs_',name,'_2Act.monthly.lag', params_combination,
             #'_t_min_',str(tau_min),'_t_max_', str(tau_max),'pc_alpha',str(pc_alpha),'.lag',str( parents_MT[i][1]), 'sign_lev',str(round(adjusted_pvalues[link_number, lag],4)) ]))
-            print(fulldata[:,index_in_fulldata].size)
+            print((fulldata[:,index_in_fulldata].size))
             print(name)
         else :
-            print 'Index itself is also causal parent -> skipped' 
+            print('Index itself is also causal parent -> skipped') 
             print('*******************              ***************************                ******************')
     
     if plot_all == True:
@@ -494,7 +494,7 @@ for p in [0,]:#range(7):
                 				
                     x = A_r.max() 
                 		
-                    print x
+                    print(x)
                     if x >= number_region:
                         A_number_region = np.zeros(A_r.shape)
                 			
@@ -530,7 +530,7 @@ for p in [0,]:#range(7):
                 print("count")
                 print(count)
             else :
-                print 'Index itself is also causal parent -> skipped' 
+                print('Index itself is also causal parent -> skipped') 
                 print('*******************              ***************************                ******************')
         
         else:

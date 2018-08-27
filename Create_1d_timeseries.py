@@ -13,7 +13,7 @@ import pickle
 
 filepath = '/Users/semvijverberg/Downloads/PEP-master/datafiles'
 data = pd.read_csv(os.path.join(filepath, 'PEP-T95TimeSeries.txt'))
-print data
+print(data)
 datelist = []
 values = []
 for r in data.values:

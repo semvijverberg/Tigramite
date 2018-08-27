@@ -1,24 +1,22 @@
 # -*- coding: utf-8 -*-
 #%%
-script_dir = '/Users/semvijverberg/surfdrive/Scripts/Tigramite'
-import sys, os
-os.chdir(script_dir)
-sys.path.append('/Users/semvijverberg/surfdrive/Scripts/Tigramite')
+
+import sys, os, io
+
 #import numpy
 #import matplotlib
 #matplotlib.rcParams['backend'] = "Qt4Agg"
-from mpl_toolkits.basemap import Basemap#, shiftgrid, cm
-from netCDF4 import Dataset
-from netCDF4 import num2date
-import matplotlib.pyplot as plt
+#from mpl_toolkits.basemap import Basemap#, shiftgrid, cm
 #import seaborn as sns
+#from netCDF4 import num2date
+from netCDF4 import Dataset
+import matplotlib.pyplot as plt
 from tigramite import data_processing as pp
 from tigramite.pcmci import PCMCI
 from tigramite.independence_tests import ParCorr, GPDC, CMIknn, CMIsymb
 import RGCPD_functions_version_04 as rgcpd
 import functions_tig
 import numpy as np
-import pandas as pd
 import xarray as xr
 import cartopy.crs as ccrs
 # =============================================================================
@@ -77,24 +75,21 @@ def calculate_corr_maps(filename_exp_design2, map_proj):
         except KeyError:
             print('Name in ex dictionary does not match ncdf, taking variable from'
                   'ncdf unequal to dimensions, only works when ncdf contains only 1 variable')
-            allkeysncdf = ncdf.variables.keys()
+            allkeysncdf = list(ncdf.variables.keys())
             dimensionkeys = ['time', 'lat', 'lon', 'latitude', 'longitude']
             varnc = [keync for keync in allkeysncdf if keync not in dimensionkeys][0]
             array = ncdf.variables[varnc][:,:,:].squeeze()
             
         time , nlats, nlons = array.shape # [months , lat, lon]
-        box = [ex['la_min'], ex['la_max'], ex['lo_min'], ex['lo_max']]
         # =============================================================================
         # Calculate correlation 
         # =============================================================================
-        Corr_Coeff, lat_grid, lon_grid = rgcpd.calc_corr_coeffs_new(ncdf, array, box, RV.RV_ts, time_range_all, ex['lag_min'], 
-                                                              ex['lag_max'], ex['time_cycle'], ex['RV_period'], 
-                                                              ex['alpha_fdr'], FDR_control=ex['FDR_control'])
+        Corr_Coeff, lat_grid, lon_grid = rgcpd.calc_corr_coeffs_new(ncdf, array, RV.RV_ts, time_range_all, ex)
         Corr_Coeff = np.ma.array(data = Corr_Coeff[:,:], mask = Corr_Coeff.mask[:,:])
         # =============================================================================
         # Convert regions in time series  
         # =============================================================================
-        actbox = rgcpd.extract_data(ncdf, array, time_range_all, box)
+        actbox = rgcpd.extract_data(ncdf, array, time_range_all, ex)
         actbox = np.reshape(actbox, (actbox.shape[0], -1))
         # tsCorr is total time series (.shape[0]) and .shape[1] are the correlated regions
         # stacked on top of each other (from lag_min to lag_max)
@@ -114,7 +109,7 @@ def calculate_corr_maps(filename_exp_design2, map_proj):
                                            
     
     if ex['plotin1fig'] == True and ex['showplot'] == True:
-        variables = outdic_actors.keys()
+        variables = list(outdic_actors.keys())
         functions_tig.xarray_plot_region(variables, outdic_actors, ex['lag_min'],  ex['lag_max'],
                                                map_proj, ex['tfreq'])
         fig_filename = '{}_corr_all'.format(ex['params'], allvar[0], var) + ex['file_type2']
@@ -135,18 +130,27 @@ def run_PCMCI(ex, outdic_actors, map_proj):
 #%%
     # save output
     if ex['SaveTF'] == True:
+#        from contextlib import redirect_stdout
         orig_stdout = sys.stdout
-        sys.stdout = f = open(os.path.join(ex['fig_subpath'], 'old.txt'), 'a')
+        # buffer print statement output to f
+        if sys.version[:1] == '3':
+            sys.stdout = f = io.StringIO()
+        elif sys.version[:1] == '2':
+            sys.stdout = f = open(os.path.join(ex['fig_subpath'], 'old.txt'), 'w+')
+            
+            
+
+#         = f
     # alpha level for independence test within the pc procedure (finding parents)
     pc_alpha = ex['pcA_sets'][ex['pcA_set']]
     # alpha level for multiple linear regression model while conditining on parents of
     # parents
     alpha_level = ex['alpha_level_tig']  
     print('run tigramite 3, run.pcmci')
-    print('alpha level(s) for independence tests within the pc procedure'
-          '(finding parents): {}'.format(pc_alpha))
-    print('alpha level for multiple linear regression model while conditining on parents of '
-          'parents: {}'.format(ex['alpha_level_tig']))
+    print(('alpha level(s) for independence tests within the pc procedure'
+          '(finding parents): {}'.format(pc_alpha)))
+    print(('alpha level for multiple linear regression model while conditining on parents of '
+          'parents: {}'.format(ex['alpha_level_tig'])))
    
 
  
@@ -159,7 +163,7 @@ def run_PCMCI(ex, outdic_actors, map_proj):
     var_names = [[0, allvar[0]]]
     actorlist = []
     for var in allvar[ex['excludeRV']:]:
-        print var
+        print(var)
         actor = outdic_actors[var]
         actorlist.append(actor.tsCorr)        
         # create array which numbers the regions
@@ -170,7 +174,7 @@ def run_PCMCI(ex, outdic_actors, map_proj):
         var_names = var_names + actor.var_info 
     # stack actor time-series together:
     fulldata = np.concatenate(tuple(actorlist), axis = 1)
-    print('There are {} regions in total'.format(fulldata.shape[1]))
+    print(('There are {} regions in total'.format(fulldata.shape[1])))
     # add the full 1D time series of interest as first entry:
     fulldata = np.column_stack((RV.RVfullts, fulldata))
     # save fulldata
@@ -184,11 +188,12 @@ def run_PCMCI(ex, outdic_actors, map_proj):
     # tigramite 3
     # ======================================================================================================================
     data = fulldata
-    print(data.shape)    
+    print((data.shape))    
     # RV mask False for period that I want to analyse
-    idx_start_RVperiod = int(np.where(RV.dates[RV.dates.year == ex['RV_oneyr'].year[0]] == ex['RV_oneyr'][0])[0])
+    idx_start_RVperiod = int(np.where(RV.dates == RV.datesRV.min())[0])
     data_mask = np.ones(data.shape, dtype='bool') # true for actor months, false for RV months
-    for i in range(ex['RV_oneyr'].size): # total timesteps RV period, 12 is 
+    steps_in_oneyr = len(RV.datesRV[RV.datesRV.year == ex['startyear']])
+    for i in range(steps_in_oneyr): # total timesteps RV period, 12 is 
         data_mask[idx_start_RVperiod+i:: ex['time_cycle'],:] = False 
     T, N = data.shape # Time, Regions
     # ======================================================================================================================
@@ -294,28 +299,36 @@ def run_PCMCI(ex, outdic_actors, map_proj):
             # *********************************************************
             according_fullname = str(according_number) + according_varname
             name = ''.join([str(index_in_fulldata),'_',according_fullname])
-            print(fulldata[:,index_in_fulldata].size)
+            print((fulldata[:,index_in_fulldata].size))
             print(name)
         else :
             print('Index itself is also causal parent -> skipped')
             print('*******************              ***************************')
  
     if ex['SaveTF'] == True:
-        f.close()    
-        # reopen the file to reorder the lines
-        in_file=open(os.path.join(ex['fig_subpath'], 'old.txt'),"rb")     
-        contents = in_file.read()
-        in_file.close()    
-        cont_split = contents.splitlines()
-        # save a new file    
-        in_file=open(os.path.join(ex['fig_subpath'], ex['params']+'.txt'),"wb")
-        for i in range(0,len(cont_split)):
-            in_file.write(cont_split[i]+'\r\n')
-        in_file.close()
+        if sys.version[:1] == '3':
+            file = io.open(os.path.join(ex['fig_subpath'], ex['params']+'.txt'), mode='w+')  
+            file.write(f.getvalue())
+            file.close()
+            f.close() 
+        elif sys.version[:1] == '2':
+            f.close()    
+            # reopen the file to reorder the lines
+#            in_file=open(os.path.join(ex['fig_subpath'], 'old.txt'),"rb")     
+#            contents = in_file.read()
+#            in_file.close()    
+#            cont_split = contents.splitlines()
+#            # save a new file    
+#            in_file=open(os.path.join(ex['fig_subpath'], ex['params']+'.txt'),"wb")
+#            for i in range(0,len(cont_split)):
+#                in_file.write(cont_split[i]+'\r\n')
+#            in_file.close()
+            # delete old file
+#            os.remove(os.path.join(ex['fig_subpath'],'old.txt')) 
         # pass output to original console again
         sys.stdout = orig_stdout
-        # delete old file
-        os.remove(os.path.join(ex['fig_subpath'],'old.txt')) 
+
+
         #%%
     return parents_RV, var_names
 #%%
@@ -338,7 +351,7 @@ def plottingfunction(ex, parents_RV, var_names, outdic_actors, map_proj):
     Corr_precursor_ALL = Corr_Coeff_list
     # shape of Corr_Coeff_all_r_l = [prec_vars, gridpoints, lags]
     Corr_Coeff_all_r_l = np.ma.array(Corr_precursor_ALL)
-    lags = range(ex['lag_min'],ex['lag_max']+1)
+    lags = list(range(ex['lag_min'],ex['lag_max']+1))
     prec_names = np.array(allvar[ex['excludeRV']:])
     if ex['plotin1fig'] == True:
       # Build array, keeping only correlated regions that are sign after tigramite step

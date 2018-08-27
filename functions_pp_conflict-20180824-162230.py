@@ -307,8 +307,8 @@ def preprocessing_ncdf(outfile, datesstr, cls, ex):
     sel_dates2 = 'cdo -O select,date={} {} {}'.format(cdostr(datesstr[1]), infile, tmpfile+'2.nc')
     sel_dates3 = 'cdo -O select,date={} {} {}'.format(cdostr(datesstr[2]), infile, tmpfile+'3.nc')
     sel_dates4 = 'cdo -O select,date={} {} {}'.format(cdostr(datesstr[3]), infile, tmpfile+'4.nc')
-    concat = 'cdo -O cat {} {} {} {} {}'.format(tmpfile+'1.nc', tmpfile+'2.nc', tmpfile+'3.nc',
-                             tmpfile+'4.nc', tmpfile+'sd.nc')
+    concat = 'cdo -O cat {} {} {}'.format(tmpfile+'1.nc', tmpfile+'2.nc', 
+                         tmpfile+'3.nc', tmpfile+'4.nc', tmpfile+'sd.nc')
     convert_temp_freq = 'cdo timselmean,{} {} {}'.format(timesteps, tmpfile+'sd.nc', tmpfile+'tf.nc')
     convert_time_axis = 'cdo setreftime,1900-01-01,00:00:00 -setcalendar,gregorian {} {}'.format(
             tmpfile+'tf.nc', tmpfile+'hom.nc')
@@ -351,11 +351,22 @@ def preprocessing_ncdf(outfile, datesstr, cls, ex):
     ncdf.close()
     # ORDER of commands, --> is important!
 
-#    args = [detrend, anom] # splitting string because of a limit to length
-    args = [sel_dates1, sel_dates2]
+    args = [detrend, anom] # splitting string because of a limit to length
+
+    bash_script = os.path.join(os.getcwd(),'bash_scripts', "bash_script.sh")
+    with open(bash_script, "w") as file:
+        file.write("#!/bin/sh\n")
+        file.write("echo starting bash script\n")
+        for No_args in range(len(args)):
+            if No_args != 0:
+                file.write("{}\n".format(args[No_args-1]))  
+    for cmd in args:
+        print(cmd)
+        os.system(str(cmd))
     kornshell_with_input(args)
     args = [sel_dates3, sel_dates4, concat, convert_temp_freq, convert_time_axis,detrend, anom, 
             rm_timebnds, rm_res_timebnds, add_path_raw, add_units, echo_end] 
+#    args = [detrend, anom, rm_timebnds, rm_res_timebnds, add_path_raw, add_units, echo_end]
     kornshell_with_input(args)
 # =============================================================================
 #     # update class (more a check if dates are indeed correct)
@@ -364,9 +375,7 @@ def preprocessing_ncdf(outfile, datesstr, cls, ex):
     return cls, ex
 
 def kornshell_with_input(args):
-#    stopped working for cdo commands
     '''some kornshell with input '''
-#    args = [anom]
     import os
     import subprocess
     cwd = os.getcwd()
@@ -375,18 +384,17 @@ def kornshell_with_input(args):
 #    arg_5d_mean = 'cdo timselmean,5 {} {}'.format(infile, outfile)
     #arg1 = 'ncea -d latitude,59.0,84.0 -d longitude,-95,-10 {} {}'.format(infile, outfile)
     
+#    bash_and_args = [new_bash_script, arg_5d_mean]
     bash_and_args = [new_bash_script]
     [bash_and_args.append(arg) for arg in args]
     with open(new_bash_script, "w") as file:
         file.write("#!/bin/sh\n")
         file.write("echo starting bash script\n")
-        for cmd in range(len(args)):
-
-            print(args[cmd][:100])
-            file.write("${}\n".format(cmd+1)) 
+        for No_args in range(len(bash_and_args)):
+            if No_args != 0:
+                file.write("{}\n".format(args[No_args-1])) 
     p = subprocess.Popen(bash_and_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, 
-                         stderr=subprocess.STDOUT)
-                         
+                         stderr=subprocess.STDOUT, shell=True)
     out = p.communicate()
     print(out[0].decode())
     return

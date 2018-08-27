@@ -18,6 +18,8 @@ from matplotlib.patches import Polygon
 from matplotlib import gridspec
 import seaborn as sns
 from statsmodels.sandbox.stats import multicomp
+import xarray as xr
+import cartopy.crs as ccrs
 
 
 
@@ -40,11 +42,11 @@ def extract_data(d, D, index_range, box):
 	index_0 = index_range[0]
 	index_n = index_range[1]
 
-	if 'latitude' in d.variables.keys():
+	if 'latitude' in list(d.variables.keys()):
 	  lat = d.variables['latitude'][:]
 	else:
 	  lat = d.variables['lat'][:]
-	if 'longitude' in d.variables.keys():
+	if 'longitude' in list(d.variables.keys()):
 	  lon = d.variables['longitude'][:]
 	else:
 	  lon = d.variables['lon'][:]
@@ -142,11 +144,11 @@ def calc_corr_coeffs_new(v, V, box, I, time_range_indices, lag_min, lag_max, tim
 		
 	d = v
 	
-	if 'latitude' in d.variables.keys():
+	if 'latitude' in list(d.variables.keys()):
 	    lat = d.variables['latitude'][:]
 	else:
 	    lat = d.variables['lat'][:]
-	if 'longitude' in d.variables.keys():
+	if 'longitude' in list(d.variables.keys()):
 	    lon = d.variables['longitude'][:]
 	else:
 	    lon = d.variables['lon'][:]
@@ -172,16 +174,15 @@ def calc_corr_coeffs_new(v, V, box, I, time_range_indices, lag_min, lag_max, tim
 	# reshape
 	sat = np.reshape(sat, (sat.shape[0],-1))
 
+	[var for var in list(d.variables.keys()) if var not in 'longitude time latitude']   
+	print('calculating correlation maps for {}'.format(var))
 	
-	print 'calculating correlation maps for'
-	
-
 	
 	for i in range(lag_steps):
 
 		lag = lag_min + i
 		
-		print 'lag', lag
+		print('lag', lag)
 		months_indices_lagged = [r - lag for r in RV_indices]
 		
 		# only winter months 		
@@ -210,10 +211,10 @@ def calc_corr_coeffs_new(v, V, box, I, time_range_indices, lag_min, lag_max, tim
 
 def plot_corr_coeffs(Corr_Coeff, m, lag_min, lat_grid, lon_grid, title='Corr Maps for different time lags', Corr_mask=False):	
 	'''
-	This function plots the differnt corr coeffs on map m. the variable title must be a string. 
-     If mask==True, only significant values are shown.
-	'''	
-     print("plotting correlation maps... ")
+	This function plots the differnt corr coeffs on map m. the variable title must be a string. If mask==True, only significant values are shown.
+	'''
+	
+	print('plotting correlation maps...')
 	n_rows = Corr_Coeff.shape[1]
 	fig = plt.figure(figsize=(4, 2*n_rows))
 	#fig.subplots_adjust(left=None, bottom = None, right=None, top=0.3, wspace=0.1, hspace= 0.1)
@@ -314,7 +315,7 @@ def define_regions_and_rank_new(Corr_Coeff, lat_grid, lon_grid):
 
 	return A: the matrix whichs entries correspond to region. 1 = strongest, 2 = second strongest...
 	'''
-	print 'extracting causal precursor regions ...\n'
+	print('extracting causal precursor regions ...\n')
 
 	
 	# initialize arrays:
@@ -503,83 +504,89 @@ def define_regions_and_rank_new(Corr_Coeff, lat_grid, lon_grid):
 
 	
 
-def calc_actor_ts_and_plot(Corr_GPH, GPH_box_anom, lag_min, lat_grid_gph, lon_grid_gph, m, title):
-	
-	"""
+def calc_actor_ts_and_plot(Corr_Coeff, actbox, ex, lat_grid, lon_grid, var):
+    """
 	Calculates the time-series of the actors based on the correlation coefficients and plots the according regions. 
 	Only caluclates regions with significant correlation coefficients
 	"""
-	# preparations
+    if Corr_Coeff.ndim == 1:
+        lag_steps = 1
+        n_rows = 1
+    else:
+        lag_steps = Corr_Coeff.shape[1]
+        n_rows = Corr_Coeff.shape[1]
+
 	
-	if Corr_GPH.ndim == 1:
-		lag_steps = 1
-		n_rows = 1
-	else:
-			lag_steps = Corr_GPH.shape[1]
-			n_rows = Corr_GPH.shape[1]
-	
-	la_gph = lat_grid_gph.shape[0]
-	lo_gph = lon_grid_gph.shape[0]
-	lons_gph, lats_gph = numpy.meshgrid(lon_grid_gph, lat_grid_gph)
+    la_gph = lat_grid.shape[0]
+    lo_gph = lon_grid.shape[0]
+    lons_gph, lats_gph = numpy.meshgrid(lon_grid, lat_grid)
 
-	cos_box_gph = numpy.cos(numpy.deg2rad(lats_gph))
-	cos_box_gph_array = repeat(cos_box_gph[newaxis,:], GPH_box_anom.shape[0], 0)
-	cos_box_gph_array = np.reshape(cos_box_gph_array, (cos_box_gph_array.shape[0], -1))
+    cos_box_gph = numpy.cos(numpy.deg2rad(lats_gph))
+    cos_box_gph_array = np.repeat(cos_box_gph[None,:], actbox.shape[0], 0)
+    cos_box_gph_array = np.reshape(cos_box_gph_array, (cos_box_gph_array.shape[0], -1))
 
 
-	Actors_ts_GPH = [[] for i in range(lag_steps)]
+    Actors_ts_GPH = [[] for i in range(lag_steps)]
 	
 	#test = [len(a) for a in Actors_ts_GPH]
 	#print test
 	
 
 	
-	fig_GPH = plt.figure(figsize=(4, 2*n_rows))
-	plt.suptitle(title, fontsize=14)	
+#	fig_GPH = plt.figure(figsize=(4, 2*n_rows))
+#	plt.suptitle(title, fontsize=14)	
 	#cmap_regions = 'Paired' 
 	#cmap_regions = plt.get_cmap('Paired')
 
-	cmap_regions = matplotlib.colors.ListedColormap(sns.color_palette("Set2"))
-	cmap_regions.set_bad('w')
+    cmap_regions = matplotlib.colors.ListedColormap(sns.color_palette("Set2"))
+    cmap_regions.set_bad('w')
 	
-	colors = ["faded green"]
-	color = sns.xkcd_palette(colors)
+    colors = ["faded green"]
+    color = sns.xkcd_palette(colors)
 
-	Number_regions_per_lag = np.zeros(lag_steps)
-	x = 0
+    Number_regions_per_lag = np.zeros(lag_steps)
+    x = 0
 	# vmax = 50
-	for i in range(lag_steps):
+    for i in range(lag_steps):
 		
-		if Corr_GPH.ndim ==1:
-			Regions_lag_i = define_regions_and_rank_new(Corr_GPH, lat_grid_gph, lon_grid_gph)
+        if Corr_Coeff.ndim ==1:
+			Regions_lag_i = define_regions_and_rank_new(Corr_Coeff, lat_grid, lon_grid)
 		
-		else:
-			Regions_lag_i = define_regions_and_rank_new(Corr_GPH[:,i], lat_grid_gph, lon_grid_gph)
+        else:
+            Regions_lag_i = define_regions_and_rank_new(Corr_Coeff[:,i], lat_grid, lon_grid)
 		
 		
-		if Regions_lag_i.max()> 0:
-
-			n_regions_lag_i = int(Regions_lag_i.max())
+        if Regions_lag_i.max()> 0:
+            n_regions_lag_i = int(Regions_lag_i.max())
+            print(('{} regions detected for lag {}, variable {}'.format(n_regions_lag_i, ex['lag_min']+i,var)))
+            x_reg = numpy.max(Regions_lag_i)
 			
-			print n_regions_lag_i, ' regions detected for lag ', lag_min+ i
-
-
-			x_reg = numpy.max(Regions_lag_i)
+#            levels = numpy.arange(x, x + x_reg +1)+.5
+            A_r = numpy.reshape(Regions_lag_i, (la_gph, lo_gph))
+            A_r + x
+            
+#            A_number_region = numpy.zeros(A_r.shape)
+#            A_number_region[A_r == number_region]=1
+            
+#            xr_A_num_reg = xr.DataArray(data=A_r, coords=[lat_grid, lon_grid], dims=('latitude','longitude'))
+#            map_proj = map_proj
+#            plt.figure(figsize=(6, 4))
+#            ax = plt.axes(projection=map_proj)
+#            im = xr_A_num_reg.plot.pcolormesh(ax=ax, cmap=plt.cm.BuPu,
+#                             transform=ccrs.PlateCarree(), add_colorbar=True)
+#            plt.colorbar(im, ax=ax , orientation='horizontal')
+#            ax.coastlines(color='grey', alpha=0.3)
+#            ax.set_title('lag = -' + str(lag), fontsize=12)
+            
+#			plt.subplot(lag_steps,1, i+1)
+#			lag = ex['lag_min'] +i
+#			plt.title('lag = -' + str(lag), fontsize=12)
 			
-			levels = numpy.arange(x, x + x_reg +1)+.5
-
-			A_r = numpy.reshape(Regions_lag_i, (la_gph, lo_gph))
-			A_r = A_r + x
-			
-			plt.subplot(lag_steps,1, i+1)
-			lag = lag_min +i
-			plt.title('lag = -' + str(lag), fontsize=12)
-			
-			plot_basemap_options(m)		
+#			plot_basemap_options(m)		
 			#m.contourf(lons_gph,lats_gph, A_r, levels, latlon = True, cmap = cmap_regions)
 			
 			# all in one color:
-			m.contourf(lons_gph,lats_gph, A_r, levels, latlon = True, colors = color, vmin = 1, vmax = n_regions_lag_i)
+#			m.contourf(lons_gph,lats_gph, A_r, levels, latlon = True, colors = color, vmin = 1, vmax = n_regions_lag_i)
 
 			
 			# if colors should be different for each subplot:
@@ -588,57 +595,47 @@ def calc_actor_ts_and_plot(Corr_GPH, GPH_box_anom, lag_min, lat_grid_gph, lon_gr
 			
 			#m.colorbar(location="bottom", ticks = numpy.arange(x+1, x+ x_reg+1))
 
-			
-			x = A_r.max() 
+            x = A_r.max() 
 
 			# this array will be the time series for each region
-			ts_regions_lag_i = np.zeros((GPH_box_anom.shape[0], n_regions_lag_i))
-		
-
-		
-			for j in range(n_regions_lag_i):
-				B = np.zeros(Regions_lag_i.shape)
-				B[Regions_lag_i == j+1] = 1
+            ts_regions_lag_i = np.zeros((actbox.shape[0], n_regions_lag_i))
 				
-				ts_regions_lag_i[:,j] = np.mean(GPH_box_anom[:, B == 1] * cos_box_gph_array[:, B == 1], axis =1)
+            for j in range(n_regions_lag_i):
+                B = np.zeros(Regions_lag_i.shape)
+                B[Regions_lag_i == j+1] = 1	
+                ts_regions_lag_i[:,j] = np.mean(actbox[:, B == 1] * cos_box_gph_array[:, B == 1], axis =1)
 
-				
-
-			Actors_ts_GPH[i] = ts_regions_lag_i
+            Actors_ts_GPH[i] = ts_regions_lag_i
 		
-		else:
-			print 'no regions detected for lag ', lag_min + i
-			
-			Actors_ts_GPH[i] = np.array([])
-			n_regions_lag_i = 0
+        else:
+            print('no regions detected for lag ', ex['lag_min'] + i)	
+            Actors_ts_GPH[i] = np.array([])
+            n_regions_lag_i = 0
 		
-		Number_regions_per_lag[i] = n_regions_lag_i
+        Number_regions_per_lag[i] = n_regions_lag_i
 		
-	# fig_GPH.tight_layout(rect=[0, 0.03, 1, 0.93])
 
-
-	
-	if np.sum(Number_regions_per_lag) ==0:
-		print 'no regions detected at all'
+    if np.sum(Number_regions_per_lag) ==0:
+		print('no regions detected at all')
 		Actors_GPH = np.array([])
 	
-	else:
-		print np.sum(Number_regions_per_lag), ' regions detected in total'
+    else:
+        print(np.sum(Number_regions_per_lag), ' regions detected in total')
 		
 		# check for whcih lag the first regions are detected
-		d = 0
+        d = 0
 		
-		while (Actors_ts_GPH[d].shape[0]==0) & (d < lag_steps):
-			d = d+1
-			print d
+        while (Actors_ts_GPH[d].shape[0]==0) & (d < lag_steps):
+            d = d+1
+            print(d)
 		
 		# make one array out of it:
-		Actors_GPH = Actors_ts_GPH[d]
+        Actors_GPH = Actors_ts_GPH[d]
 		
-		for i in range(d+1, len(Actors_ts_GPH)):
-			if Actors_ts_GPH[i].shape[0]>0:		
+        for i in range(d+1, len(Actors_ts_GPH)):
+            if Actors_ts_GPH[i].shape[0]>0:		
 				
-				Actors_GPH = np.concatenate((Actors_GPH, Actors_ts_GPH[i]), axis = 1)		
+                Actors_GPH = np.concatenate((Actors_GPH, Actors_ts_GPH[i]), axis = 1)		
 		
 			# if Actors_ts_GPH[i].shape[0]==0:
 				# print i+1
@@ -647,79 +644,64 @@ def calc_actor_ts_and_plot(Corr_GPH, GPH_box_anom, lag_min, lat_grid_gph, lon_gr
 				# Actors_GPH = np.concatenate((Actors_GPH, Actors_ts_GPH[i]), axis = 1)
 		
 
-	return Actors_GPH, Number_regions_per_lag, fig_GPH
+	return Actors_GPH, Number_regions_per_lag#, fig_GPH
 	
 
-# Todo: plot them all in one field like in GRL paper
 	
-def print_particular_region(number_region, Corr_GPH, lat_grid_gph, lon_grid_gph, m, title):
+def print_particular_region(number_region, Corr_Coeff_lag_i, actor, map_proj, title):
+#    (number_region, Corr_Coeff_lag_i, latitudes, longitudes, map_proj, title)=(according_number, Corr_precursor[:, :], actor.lat_grid, actor.lon_grid, map_proj, according_fullname) 
+    #%%
+    # check if only one lag is tested:
+    if Corr_Coeff_lag_i.ndim == 1:
+        lag_steps = 1
+
+    else:
+        lag_steps = Corr_Coeff_lag_i.shape[1]
+
+    latitudes = actor.lat_grid
+    longitudes = actor.lon_grid
+    
+    x = 0
+    for i in range(lag_steps):
 	
-	# check if only one lag is tested:
-	if Corr_GPH.ndim == 1:
-		lag_steps = 1
-
-	else:
-		lag_steps = Corr_GPH.shape[1]
-
-	# plotting preparations
-	la_gph = lat_grid_gph.shape[0]
-	lo_gph = lon_grid_gph.shape[0]
-	lons_gph, lats_gph = numpy.meshgrid(lon_grid_gph, lat_grid_gph)
-
-	
-	#test = [len(a) for a in Actors_ts_GPH]
-	#print test
-	fig_region = plt.figure(figsize=(6, 4))
-	
-	#cmap_regions = matplotlib.colors.ListedColormap(sns.color_palette("Set2"))
-	#cmap_regions.set_bad('w')
-
-
-	x = 0
-	# vmax = 50
-	for i in range(lag_steps):
-	
-		if Corr_GPH.ndim == 1:
-			Regions_lag_i = define_regions_and_rank_new(Corr_GPH, lat_grid_gph, lon_grid_gph)
+        if Corr_Coeff_lag_i.ndim == 1:
+            Regions_lag_i = define_regions_and_rank_new(Corr_Coeff_lag_i, latitudes, longitudes)
 		
-		else:	
-			Regions_lag_i = define_regions_and_rank_new(Corr_GPH[:,i], lat_grid_gph, lon_grid_gph)
+        else:	
+            Regions_lag_i = define_regions_and_rank_new(Corr_Coeff_lag_i[:,i], latitudes, longitudes)
 		
+        if Regions_lag_i.count()==0:
+            n_regions_lag_i = 0
 		
-		
-		if Regions_lag_i.count()==0:
-			n_regions_lag_i = 0
-		
-		else:
-			n_regions_lag_i = int(Regions_lag_i.max())
-			x_reg = numpy.max(Regions_lag_i)	
-			levels = numpy.arange(x, x + x_reg +1)+.5
+        else:	
+            n_regions_lag_i = int(Regions_lag_i.max())
+            x_reg = numpy.max(Regions_lag_i)	
+            levels = numpy.arange(x, x + x_reg +1)+.5
 
 		
-			A_r = numpy.reshape(Regions_lag_i, (la_gph, lo_gph))
-			A_r = A_r + x			
-			x = A_r.max() 
+            A_r = numpy.reshape(Regions_lag_i, (latitudes.size, longitudes.size))
+            A_r = A_r + x			
+            x = A_r.max() 
+            print(x)
 		
-		print x
 		
-		
-		if (x >= number_region) & (x>0):
+        if (x >= number_region) & (x>0):
 					
-			A_number_region = np.zeros(A_r.shape)
-			A_number_region[A_r == number_region]=1
-			
-			plt.plot()
-			plt.title(title)
-			plot_basemap_options(m)		
-			m.contourf(lons_gph,lats_gph, A_number_region, latlon = True)
-			# if colors should be different for each subplot:
-			#m.contourf(lons_gph,lats_gph, A_r, levels, latlon = True, cmap = cmap_regions, vmin = 1, cmax = vmax)
-			# m.colorbar(location="bottom")
-			
-			break
-
-	
-	return fig_region, A_number_region
+            A_number_region = numpy.zeros(A_r.shape)
+            A_number_region[A_r == number_region]=1
+            xr_A_num_reg = xr.DataArray(data=A_number_region, coords=[latitudes, longitudes], dims=('latitude','longitude'))
+            map_proj = map_proj
+            plt.figure(figsize=(6, 4))
+            ax = plt.axes(projection=map_proj)
+            im = xr_A_num_reg.plot.pcolormesh(ax=ax, cmap=plt.cm.BuPu,
+                             transform=ccrs.PlateCarree(), add_colorbar=False)
+            plt.colorbar(im, ax=ax , orientation='horizontal')
+            ax.coastlines(color='grey', alpha=0.3)
+            ax.set_title(title)
+            
+            break
+#%%
+    return
 
 	
 		

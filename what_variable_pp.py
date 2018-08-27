@@ -77,7 +77,7 @@ class Variable:
 
         filename = '{}_{}-{}_{}_{}_{}_{}deg'.format(self.name, self.startyear, self.endyear, self.startmonth, self.endmonth, 'daily', self.grid).replace(' ', '_')
         self.filename = filename +'.nc'
-        print("Variable function selected {} \n".format(self.filename))
+        print(("Variable function selected {} \n".format(self.filename)))
 
 #
 #

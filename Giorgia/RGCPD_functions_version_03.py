@@ -40,11 +40,11 @@ def extract_data(d, D, index_range, box):
 	index_0 = index_range[0]
 	index_n = index_range[1]
 
-	if 'latitude' in d.variables.keys():
+	if 'latitude' in list(d.variables.keys()):
 	  lat = d.variables['latitude'][:]
 	else:
 	  lat = d.variables['lat'][:]
-	if 'longitude' in d.variables.keys():
+	if 'longitude' in list(d.variables.keys()):
 	  lon = d.variables['longitude'][:]
 	else:
 	  lon = d.variables['lon'][:]
@@ -142,11 +142,11 @@ def calc_corr_coeffs_new(v, V, box, I, time_range_indices, lag_min, lag_max, tim
 		
 	d = v
 	
-	if 'latitude' in d.variables.keys():
+	if 'latitude' in list(d.variables.keys()):
 	    lat = d.variables['latitude'][:]
 	else:
 	    lat = d.variables['lat'][:]
-	if 'longitude' in d.variables.keys():
+	if 'longitude' in list(d.variables.keys()):
 	    lon = d.variables['longitude'][:]
 	else:
 	    lon = d.variables['lon'][:]
@@ -173,7 +173,7 @@ def calc_corr_coeffs_new(v, V, box, I, time_range_indices, lag_min, lag_max, tim
 	sat = np.reshape(sat, (sat.shape[0],-1))
 
 	
-	print 'calculating correlation maps for'
+	print('calculating correlation maps for')
 	
 
 	
@@ -181,7 +181,7 @@ def calc_corr_coeffs_new(v, V, box, I, time_range_indices, lag_min, lag_max, tim
 
 		lag = lag_min + i
 		
-		print 'lag', lag
+		print('lag', lag)
 		months_indices_lagged = [r - lag for r in RV_indices]
 		
 		# only winter months 		
@@ -213,7 +213,7 @@ def plot_corr_coeffs(Corr_Coeff, m, lag_min, lat_grid, lon_grid, title='Corr Map
 	This function plots the differnt corr coeffs on map m. the variable title must be a string. If mask==True, only significant values are shown.
 	'''
 	
-	print 'plotting correlation maps...'
+	print('plotting correlation maps...')
 	n_rows = Corr_Coeff.shape[1]
 	fig = plt.figure(figsize=(4, 2*n_rows))
 	#fig.subplots_adjust(left=None, bottom = None, right=None, top=0.3, wspace=0.1, hspace= 0.1)
@@ -314,7 +314,7 @@ def define_regions_and_rank_new(Corr_Coeff, lat_grid, lon_grid):
 
 	return A: the matrix whichs entries correspond to region. 1 = strongest, 2 = second strongest...
 	'''
-	print 'extracting causal precursor regions ...\n'
+	print('extracting causal precursor regions ...\n')
 
 	
 	# initialize arrays:
@@ -561,7 +561,7 @@ def calc_actor_ts_and_plot(Corr_GPH, GPH_box_anom, lag_min, lat_grid_gph, lon_gr
 
 			n_regions_lag_i = int(Regions_lag_i.max())
 			
-			print n_regions_lag_i, ' regions detected for lag ', lag_min+ i
+			print(n_regions_lag_i, ' regions detected for lag ', lag_min+ i)
 
 
 			x_reg = numpy.max(Regions_lag_i)
@@ -607,7 +607,7 @@ def calc_actor_ts_and_plot(Corr_GPH, GPH_box_anom, lag_min, lat_grid_gph, lon_gr
 			Actors_ts_GPH[i] = ts_regions_lag_i
 		
 		else:
-			print 'no regions detected for lag ', lag_min + i
+			print('no regions detected for lag ', lag_min + i)
 			
 			Actors_ts_GPH[i] = np.array([])
 			n_regions_lag_i = 0
@@ -619,18 +619,18 @@ def calc_actor_ts_and_plot(Corr_GPH, GPH_box_anom, lag_min, lat_grid_gph, lon_gr
 
 	
 	if np.sum(Number_regions_per_lag) ==0:
-		print 'no regions detected at all'
+		print('no regions detected at all')
 		Actors_GPH = np.array([])
 	
 	else:
-		print np.sum(Number_regions_per_lag), ' regions detected in total'
+		print(np.sum(Number_regions_per_lag), ' regions detected in total')
 		
 		# check for whcih lag the first regions are detected
 		d = 0
 		
 		while (Actors_ts_GPH[d].shape[0]==0) & (d < lag_steps):
 			d = d+1
-			print d
+			print(d)
 		
 		# make one array out of it:
 		Actors_GPH = Actors_ts_GPH[d]
@@ -700,7 +700,7 @@ def print_particular_region(number_region, Corr_GPH, lat_grid_gph, lon_grid_gph,
 			A_r = A_r + x			
 			x = A_r.max() 
 		
-		print x
+		print(x)
 		
 		
 		if (x >= number_region) & (x>0):

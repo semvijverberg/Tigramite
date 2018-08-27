@@ -40,11 +40,11 @@ def extract_data(d, D, index_range, box):
 	index_0 = index_range[0]
 	index_n = index_range[1]
 
-	if 'latitude' in d.variables.keys():
+	if 'latitude' in list(d.variables.keys()):
 	  lat = d.variables['latitude'][:]
 	else:
 	  lat = d.variables['lat'][:]
-	if 'longitude' in d.variables.keys():
+	if 'longitude' in list(d.variables.keys()):
 	  lon = d.variables['longitude'][:]
 	else:
 	  lon = d.variables['lon'][:]
@@ -142,11 +142,11 @@ def calc_corr_coeffs_new(v, V, box, I, time_range_indices, lag_min, lag_max, tim
 		
 	d = v
 	
-	if 'latitude' in d.variables.keys():
+	if 'latitude' in list(d.variables.keys()):
 	    lat = d.variables['latitude'][:]
 	else:
 	    lat = d.variables['lat'][:]
-	if 'longitude' in d.variables.keys():
+	if 'longitude' in list(d.variables.keys()):
 	    lon = d.variables['longitude'][:]
 	else:
 	    lon = d.variables['lon'][:]
@@ -181,7 +181,7 @@ def calc_corr_coeffs_new(v, V, box, I, time_range_indices, lag_min, lag_max, tim
 
 		lag = lag_min + i
 		
-		print('lag', lag)
+		print(('lag', lag))
 		months_indices_lagged = [r - lag for r in RV_indices]
 		
 		# only winter months 		
@@ -561,7 +561,7 @@ def calc_actor_ts_and_plot(Corr_GPH, GPH_box_anom, lag_min, lat_grid_gph, lon_gr
 
 			n_regions_lag_i = int(Regions_lag_i.max())
 			
-			print(n_regions_lag_i, ' regions detected for lag ', lag_min+ i)
+			print((n_regions_lag_i, ' regions detected for lag ', lag_min+ i))
 
 
 			x_reg = numpy.max(Regions_lag_i)
@@ -607,7 +607,7 @@ def calc_actor_ts_and_plot(Corr_GPH, GPH_box_anom, lag_min, lat_grid_gph, lon_gr
 			Actors_ts_GPH[i] = ts_regions_lag_i
 		
 		else:
-			print('no regions detected for lag ', lag_min + i)
+			print(('no regions detected for lag ', lag_min + i))
 			
 			Actors_ts_GPH[i] = np.array([])
 			n_regions_lag_i = 0
@@ -623,7 +623,7 @@ def calc_actor_ts_and_plot(Corr_GPH, GPH_box_anom, lag_min, lat_grid_gph, lon_gr
 		Actors_GPH = np.array([])
 	
 	else:
-		print(np.sum(Number_regions_per_lag), ' regions detected in total')
+		print((np.sum(Number_regions_per_lag), ' regions detected in total'))
 		
 		# check for whcih lag the first regions are detected
 		d = 0

@@ -78,7 +78,7 @@ n_steps = 62 # days of the summer season # means that 5 months out of the 12 are
 # start_day = time-cycle, if alls values of the years should be considered
 start_day = 150 # means start with November (= 10ther entry in array), pythonic counting
 
-seas_indices = range(n_steps)
+seas_indices = list(range(n_steps))
 
 # significnace level for correlation maps
 alpha = 0.01 #  try different values 0.001, 0.005, 0.05, 0.1
@@ -117,26 +117,26 @@ RV_indices = []
 # case 1) complete time-series
 # cut-off the first year
 if n_steps == time_cycle:
-	RV_indices = range(time_cycle*n_years)[time_cycle:]
+	RV_indices = list(range(time_cycle*n_years))[time_cycle:]
 
 # case 2) starts with Jan or lag_max is in previous year:
 # cutoff the first year
 elif start_day - lag_max < 0: #5- 5 = 0 
 	for i in range(n_steps):
-		a = range(time_cycle*n_years)[time_cycle:][start_day +i::time_cycle]
+		a = list(range(time_cycle*n_years))[time_cycle:][start_day +i::time_cycle]
 		RV_indices = RV_indices + a
 
 #case 3) winter overlap DJ
 # cut-off last year except winter
 elif start_day + n_steps >=time_cycle: #5+4 =9
 	for i in range(n_steps):
-		a = range(time_cycle*n_years)[:-(start_day + n_steps -time_cycle)][start_day +i::time_cycle]
+		a = list(range(time_cycle*n_years))[:-(start_day + n_steps -time_cycle)][start_day +i::time_cycle]
 		RV_indices = RV_indices + a
 
 #case 4) all good.
 else:
 	for i in range(n_steps):
-		a = range(time_cycle*n_years)[start_day +i::time_cycle]
+		a = list(range(time_cycle*n_years))[start_day +i::time_cycle]
 		RV_indices = RV_indices + a
 
 	
@@ -311,7 +311,7 @@ for p in [0,]:#range(7):
     # ======================================================================================================================
     # new mask
     # ======================================================================================================================
-    print(data.shape)
+    print((data.shape))
     
     data_mask = np.ones(data.shape, dtype='bool')
     for i in range(4): # take into account 4 months starting from june=5
@@ -454,7 +454,7 @@ for p in [0,]:#range(7):
             name = ''.join([str(index_in_fulldata),'_',according_fullname])
             #fulldata[:,index_in_fulldata].dump(''.join(['/home/dicapua/GOTHAM/Data/output/RGCPD/monthly/precurs_',name,'_2Act.monthly.lag', params_combination,
             #'_t_min_',str(tau_min),'_t_max_', str(tau_max),'pc_alpha',str(pc_alpha),'.lag',str( parents_MT[i][1]), 'sign_lev',str(round(adjusted_pvalues[link_number, lag],4)) ]))
-            print(fulldata[:,index_in_fulldata].size)
+            print((fulldata[:,index_in_fulldata].size))
             print(name)
         else :
             print('Index itself is also causal parent -> skipped')
